@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ぶどうキャッチゲーム</title>
+    <style>
+        * {
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            overflow: hidden;
+        }
+        html {
+            height: -webkit-fill-available;
+        }
+        canvas {
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+            max-width: 100vw;
+            max-height: 80vh;
+        }
+        #touch-controls {
+            display: none;
+            width: 100%;
+            max-width: 480px;
+            margin-top: 10px;
+            gap: 20px;
+            justify-content: center;
+        }
+        .touch-btn {
+            width: 120px;
+            height: 80px;
+            background: rgba(138, 43, 226, 0.6);
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            border-radius: 15px;
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .touch-btn:active {
+            background: rgba(138, 43, 226, 0.9);
+            transform: scale(0.95);
+        }
+        @media (pointer: coarse) {
+            #touch-controls {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <script src="https://unpkg.com/kaboom@3000.1.17/dist/kaboom.mjs" type="module"></script>
+    <script type="module">
+        import kaboom from "https://unpkg.com/kaboom@3000.1.17/dist/kaboom.mjs";
+
+        // ゲーム初期化
+        kaboom({
+            width: 480,
+            height: 640,
+            background: [135, 206, 235],
+        });
+
+        // === サウンド ===
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let bgmPlaying = false;
+
+        // BGM用の変数
+        let bgmOscillator = null;
+        let bgmGain = null;
+        let bgmInterval = null;
+
+        // BGMを開始（KPOP風）
+        function startBGM() {
+            if (bgmPlaying) return;
+            bgmPlaying = true;
+
+            bgmGain = audioCtx.createGain();
+            bgmGain.connect(audioCtx.destination);
+            bgmGain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+
+            const BPM = 128; // KPOPらしい速いテンポ
+            const beatDuration = 60 / BPM;
+            const sixteenth = beatDuration / 4;
+
+            // キャッチーなKPOP風メロディ（サビっぽい）
+            const melody = [
+                // フレーズ1
+                { note: 784, duration: sixteenth * 2 },  // ソ
+                { note: 880, duration: sixteenth * 2 },  // ラ
+                { note: 988, duration: sixteenth * 4 },  // シ
+                { note: 880, duration: sixteenth * 2 },  // ラ
+                { note: 784, duration: sixteenth * 2 },  // ソ
+                { note: 659, duration: sixteenth * 4 },  // ミ
+                // フレーズ2
+                { note: 784, duration: sixteenth * 2 },  // ソ
+                { note: 880, duration: sixteenth * 2 },  // ラ
+                { note: 988, duration: sixteenth * 2 },  // シ
+                { note: 1047, duration: sixteenth * 2 }, // 高ド
+                { note: 988, duration: sixteenth * 4 },  // シ
+                { note: 880, duration: sixteenth * 4 },  // ラ
+                // フレーズ3（ドロップ風）
+                { note: 1175, duration: sixteenth * 2 }, // 高レ
+                { note: 1047, duration: sixteenth * 2 }, // 高ド
+                { note: 988, duration: sixteenth * 2 },  // シ
+                { note: 880, duration: sixteenth * 2 },  // ラ
+                { note: 784, duration: sixteenth * 4 },  // ソ
+                { note: 659, duration: sixteenth * 4 },  // ミ
+                // フレーズ4
+                { note: 784, duration: sixteenth * 2 },  // ソ
+                { note: 659, duration: sixteenth * 2 },  // ミ
+                { note: 784, duration: sixteenth * 2 },  // ソ
+                { note: 880, duration: sixteenth * 2 },  // ラ
+                { note: 784, duration: sixteenth * 8 },  // ソ（長め）
+            ];
+
+            // ベースライン（EDM/KPOP風）
+            const bassLine = [
+                { note: 98, duration: sixteenth * 3 },   // G1
+                { note: 0, duration: sixteenth * 1 },    // 休符
+                { note: 98, duration: sixteenth * 2 },   // G1
+                { note: 110, duration: sixteenth * 2 },  // A1
+                { note: 82, duration: sixteenth * 3 },   // E1
+                { note: 0, duration: sixteenth * 1 },    // 休符
+                { note: 82, duration: sixteenth * 2 },   // E1
+                { note: 98, duration: sixteenth * 2 },   // G1
+            ];
+
+            let melodyIndex = 0;
+            let bassIndex = 0;
+            let drumStep = 0;
+            let nextMelodyTime = audioCtx.currentTime;
+            let nextBassTime = audioCtx.currentTime;
+            let nextDrumTime = audioCtx.currentTime;
+
+            function playDrum(type, time) {
+                const osc = audioCtx.createOscillator();
+                const noise = audioCtx.createOscillator();
+                const drumGain = audioCtx.createGain();
+                const noiseGain = audioCtx.createGain();
+
+                osc.connect(drumGain);
+                noise.connect(noiseGain);
+                drumGain.connect(bgmGain);
+                noiseGain.connect(bgmGain);
+
+                if (type === "kick") {
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(150, time);
+                    osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+                    drumGain.gain.setValueAtTime(0.6, time);
+                    drumGain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+                    osc.start(time);
+                    osc.stop(time + 0.15);
+                } else if (type === "snare") {
+                    osc.type = "triangle";
+                    osc.frequency.setValueAtTime(200, time);
+                    drumGain.gain.setValueAtTime(0.3, time);
+                    drumGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                    noise.type = "square";
+                    noise.frequency.setValueAtTime(500, time);
+                    noiseGain.gain.setValueAtTime(0.15, time);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.08);
+                    osc.start(time);
+                    osc.stop(time + 0.1);
+                    noise.start(time);
+                    noise.stop(time + 0.08);
+                } else if (type === "hihat") {
+                    noise.type = "square";
+                    noise.frequency.setValueAtTime(8000, time);
+                    noiseGain.gain.setValueAtTime(0.06, time);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.03);
+                    noise.start(time);
+                    noise.stop(time + 0.03);
+                }
+            }
+
+            function playMelody() {
+                if (!bgmPlaying) return;
+                const now = audioCtx.currentTime;
+
+                while (nextMelodyTime < now + 0.1) {
+                    const noteData = melody[melodyIndex % melody.length];
+                    if (noteData.note > 0) {
+                        // シンセリード（2つのオシレーターでデチューン）
+                        const osc1 = audioCtx.createOscillator();
+                        const osc2 = audioCtx.createOscillator();
+                        const noteGain = audioCtx.createGain();
+
+                        osc1.connect(noteGain);
+                        osc2.connect(noteGain);
+                        noteGain.connect(bgmGain);
+
+                        osc1.type = "sawtooth";
+                        osc2.type = "sawtooth";
+                        osc1.frequency.setValueAtTime(noteData.note, nextMelodyTime);
+                        osc2.frequency.setValueAtTime(noteData.note * 1.005, nextMelodyTime); // デチューン
+
+                        noteGain.gain.setValueAtTime(0.12, nextMelodyTime);
+                        noteGain.gain.setValueAtTime(0.1, nextMelodyTime + 0.05);
+                        noteGain.gain.exponentialRampToValueAtTime(0.01, nextMelodyTime + noteData.duration * 0.95);
+
+                        osc1.start(nextMelodyTime);
+                        osc1.stop(nextMelodyTime + noteData.duration);
+                        osc2.start(nextMelodyTime);
+                        osc2.stop(nextMelodyTime + noteData.duration);
+                    }
+                    nextMelodyTime += noteData.duration;
+                    melodyIndex++;
+                }
+            }
+
+            function playBass() {
+                if (!bgmPlaying) return;
+                const now = audioCtx.currentTime;
+
+                while (nextBassTime < now + 0.1) {
+                    const noteData = bassLine[bassIndex % bassLine.length];
+                    if (noteData.note > 0) {
+                        const osc = audioCtx.createOscillator();
+                        const bassGain = audioCtx.createGain();
+                        osc.connect(bassGain);
+                        bassGain.connect(bgmGain);
+
+                        osc.type = "sawtooth";
+                        osc.frequency.setValueAtTime(noteData.note, nextBassTime);
+
+                        bassGain.gain.setValueAtTime(0.25, nextBassTime);
+                        bassGain.gain.exponentialRampToValueAtTime(0.05, nextBassTime + noteData.duration * 0.8);
+
+                        osc.start(nextBassTime);
+                        osc.stop(nextBassTime + noteData.duration);
+                    }
+                    nextBassTime += noteData.duration;
+                    bassIndex++;
+                }
+            }
+
+            function playDrums() {
+                if (!bgmPlaying) return;
+                const now = audioCtx.currentTime;
+
+                while (nextDrumTime < now + 0.1) {
+                    const step = drumStep % 16;
+
+                    // キック: 1, 5, 9, 13拍目（4つ打ち）
+                    if (step % 4 === 0) {
+                        playDrum("kick", nextDrumTime);
+                    }
+                    // スネア: 5, 13拍目（バックビート）
+                    if (step === 4 || step === 12) {
+                        playDrum("snare", nextDrumTime);
+                    }
+                    // ハイハット: 全拍
+                    playDrum("hihat", nextDrumTime);
+
+                    nextDrumTime += sixteenth;
+                    drumStep++;
+                }
+            }
+
+            bgmInterval = setInterval(() => {
+                playMelody();
+                playBass();
+                playDrums();
+            }, 25);
+
+            playMelody();
+            playBass();
+            playDrums();
+        }
+
+        // BGMを停止
+        function stopBGM() {
+            bgmPlaying = false;
+            if (bgmInterval) {
+                clearInterval(bgmInterval);
+                bgmInterval = null;
+            }
+        }
+
+        // ユーザー操作でBGM開始（ブラウザの制限対策）
+        document.addEventListener('click', () => {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            startBGM();
+        }, { once: true });
+
+        document.addEventListener('keydown', () => {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            startBGM();
+        }, { once: true });
+
+        function playSound(type) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            switch(type) {
+                case "catch": // キャッチ音
+                    oscillator.frequency.setValueAtTime(523, audioCtx.currentTime); // ド
+                    oscillator.frequency.setValueAtTime(659, audioCtx.currentTime + 0.05); // ミ
+                    oscillator.frequency.setValueAtTime(784, audioCtx.currentTime + 0.1); // ソ
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    oscillator.type = "sine";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.15);
+                    break;
+                case "golden": // 金ぶどう
+                    oscillator.frequency.setValueAtTime(784, audioCtx.currentTime);
+                    oscillator.frequency.setValueAtTime(988, audioCtx.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(1175, audioCtx.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    oscillator.type = "sine";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.3);
+                    break;
+                case "damage": // ダメージ音
+                    oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    oscillator.frequency.setValueAtTime(100, audioCtx.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                    oscillator.type = "sawtooth";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.2);
+                    break;
+                case "powerup": // パワーアップ
+                    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    oscillator.type = "square";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.25);
+                    break;
+                case "combo": // コンボ
+                    oscillator.frequency.setValueAtTime(600 + combo * 50, audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    oscillator.type = "triangle";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.1);
+                    break;
+                case "bird": // 鳥
+                    oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+                    oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    oscillator.type = "sine";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.3);
+                    break;
+                case "gameover": // ゲームオーバー
+                    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    oscillator.frequency.setValueAtTime(300, audioCtx.currentTime + 0.2);
+                    oscillator.frequency.setValueAtTime(200, audioCtx.currentTime + 0.4);
+                    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                    oscillator.type = "sawtooth";
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.6);
+                    break;
+            }
+        }
+
+        // === ゲーム状態 ===
+        let score = 0;
+        let missed = 0;
+        const maxMissed = 3;
+        let combo = 0;
+        let maxCombo = 0;
+        let highScore = localStorage.getItem('grapeGameHighScore') || 0;
+        let gameSpeed = 1;
+        let hasShield = false;
+        let hasMagnet = false;
+        let isSlowMode = false;
+        let gameActive = true;
+
+        // === 背景：ぶどうの木 ===
+        add([
+            rect(width(), height() / 2),
+            pos(0, 0),
+            color(100, 180, 255),
+            z(-100),
+        ]);
+
+        add([
+            rect(width(), 80),
+            pos(0, height() - 80),
+            color(120, 180, 80),
+            z(-50),
+        ]);
+
+        for (let i = 0; i < 8; i++) {
+            add([
+                circle(rand(10, 25)),
+                pos(rand(0, width()), height() - rand(10, 60)),
+                color(100, 160, 60),
+                z(-49),
+            ]);
+        }
+
+        add([
+            rect(40, 500),
+            pos(30, 150),
+            color(101, 67, 33),
+            z(-40),
+        ]);
+
+        for (let i = 0; i < 5; i++) {
+            add([
+                rect(35, 3),
+                pos(32, 180 + i * 80),
+                color(80, 50, 25),
+                z(-39),
+            ]);
+        }
+
+        add([
+            rect(40, 500),
+            pos(width() - 70, 150),
+            color(101, 67, 33),
+            z(-40),
+        ]);
+
+        for (let i = 0; i < 5; i++) {
+            add([
+                rect(35, 3),
+                pos(width() - 68, 200 + i * 80),
+                color(80, 50, 25),
+                z(-39),
+            ]);
+        }
+
+        add([
+            rect(width(), 15),
+            pos(0, 60),
+            color(101, 67, 33),
+            z(-35),
+        ]);
+
+        for (let i = 0; i < 6; i++) {
+            add([
+                rect(8, 100),
+                pos(40 + i * 80, 60),
+                color(120, 80, 40),
+                z(-36),
+            ]);
+        }
+
+        const leafPositions = [
+            [60, 40], [140, 30], [220, 45], [300, 35], [380, 40], [440, 30],
+            [80, 90], [160, 100], [250, 85], [340, 95], [420, 88],
+            [30, 140], [100, 130], [200, 145], [280, 135], [360, 140], [450, 130],
+        ];
+
+        leafPositions.forEach(([lx, ly]) => {
+            add([
+                polygon([
+                    vec2(0, -15), vec2(15, -5), vec2(12, 10),
+                    vec2(0, 15), vec2(-12, 10), vec2(-15, -5),
+                ]),
+                pos(lx, ly),
+                color(34 + rand(-10, 10), 139 + rand(-20, 20), 34 + rand(-10, 10)),
+                z(-30),
+            ]);
+        });
+
+        const bgGrapePositions = [[70, 120], [180, 100], [290, 130], [400, 110]];
+        bgGrapePositions.forEach(([gx, gy]) => {
+            [[0, 0], [-6, 8], [6, 8], [-3, 16], [3, 16]].forEach(([ox, oy]) => {
+                add([
+                    circle(6),
+                    pos(gx + ox, gy + oy),
+                    color(100, 30, 120),
+                    z(-25),
+                ]);
+            });
+        });
+
+        [[80, 25], [250, 15], [400, 30]].forEach(([cx, cy]) => {
+            add([circle(20), pos(cx, cy), color(255, 255, 255), opacity(0.7), z(-90)]);
+            add([circle(15), pos(cx - 18, cy + 5), color(255, 255, 255), opacity(0.7), z(-90)]);
+            add([circle(15), pos(cx + 18, cy + 5), color(255, 255, 255), opacity(0.7), z(-90)]);
+        });
+
+        // === キャラクター ===
+        const playerX = width() / 2;
+        const playerY = height() - 80;
+
+        const body = add([rect(30, 40), pos(playerX, playerY + 20), anchor("center"), color(255, 100, 100), z(1)]);
+        const head = add([circle(20), pos(playerX, playerY - 25), anchor("center"), color(255, 220, 180), z(2)]);
+        const eyeL = add([circle(5), pos(playerX - 8, playerY - 28), anchor("center"), color(0, 0, 0), z(3)]);
+        const eyeR = add([circle(5), pos(playerX + 8, playerY - 28), anchor("center"), color(0, 0, 0), z(3)]);
+        const mouth = add([rect(15, 4), pos(playerX, playerY - 15), anchor("center"), color(200, 100, 100), z(3)]);
+        const armL = add([rect(8, 30), pos(playerX - 25, playerY + 5), anchor("center"), color(255, 220, 180), z(0)]);
+        const armR = add([rect(8, 30), pos(playerX + 25, playerY + 5), anchor("center"), color(255, 220, 180), z(0)]);
+        const legL = add([rect(12, 25), pos(playerX - 10, playerY + 52), anchor("center"), color(70, 70, 200), z(1)]);
+        const legR = add([rect(12, 25), pos(playerX + 10, playerY + 52), anchor("center"), color(70, 70, 200), z(1)]);
+        const basket = add([rect(70, 35), pos(playerX, playerY + 25), anchor("center"), color(160, 82, 45), z(4)]);
+        const basketRim = add([rect(80, 8), pos(playerX, playerY + 5), anchor("center"), color(139, 69, 19), z(4)]);
+        const basketLine1 = add([rect(65, 3), pos(playerX, playerY + 18), anchor("center"), color(120, 60, 30), z(5)]);
+        const basketLine2 = add([rect(65, 3), pos(playerX, playerY + 32), anchor("center"), color(120, 60, 30), z(5)]);
+
+        // シールドエフェクト
+        const shieldEffect = add([
+            circle(50),
+            pos(playerX, playerY),
+            anchor("center"),
+            color(0, 200, 255),
+            opacity(0),
+            z(6),
+        ]);
+
+        const hitbox = add([
+            rect(80, 40),
+            pos(playerX, playerY + 15),
+            anchor("center"),
+            area(),
+            opacity(0),
+            "player",
+        ]);
+
+        const allParts = [body, head, eyeL, eyeR, mouth, armL, armR, legL, legR, basket, basketRim, basketLine1, basketLine2, hitbox, shieldEffect];
+        let currentX = playerX;
+
+        function movePlayer(dx) {
+            const newX = currentX + dx;
+            if (newX > 50 && newX < width() - 50) {
+                allParts.forEach(part => part.pos.x += newX - currentX);
+                currentX = newX;
+            }
+        }
+
+        // === UI ===
+        const scoreText = add([text("スコア: 0", { size: 24 }), pos(10, 10), color(0, 0, 0), z(10)]);
+        const missText = add([text("ミス: 0/" + maxMissed, { size: 24 }), pos(10, 40), color(255, 0, 0), z(10)]);
+        const comboText = add([text("", { size: 20 }), pos(width() - 10, 10), anchor("topright"), color(255, 150, 0), z(10)]);
+        const highScoreText = add([text("ハイスコア: " + highScore, { size: 18 }), pos(width() - 10, 35), anchor("topright"), color(100, 100, 100), z(10)]);
+
+        // パワーアップ表示
+        const powerUpText = add([text("", { size: 16 }), pos(10, 70), color(0, 150, 255), z(10)]);
+
+        // モバイル判定
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 'ontouchstart' in window;
+        const controlText = add([text(isMobile ? "ボタンで移動" : "← → で移動 / コントローラー対応", { size: 16 }), pos(width() / 2, height() - 15), anchor("center"), color(50, 50, 50), z(10)]);
+
+        function updateUI() {
+            scoreText.text = "スコア: " + score;
+            missText.text = "ミス: " + missed + "/" + maxMissed;
+            if (combo >= 2) {
+                comboText.text = combo + "コンボ! x" + Math.min(combo, 5);
+            } else {
+                comboText.text = "";
+            }
+
+            let powers = [];
+            if (hasShield) powers.push("🛡️シールド");
+            if (hasMagnet) powers.push("🧲マグネット");
+            if (isSlowMode) powers.push("⏱️スロー");
+            powerUpText.text = powers.join(" ");
+        }
+
+        // === 難易度上昇 ===
+        function getDifficultyMultiplier() {
+            return 1 + Math.floor(score / 10) * 0.15;
+        }
+
+        // === うんち生成 ===
+        function spawnPoop() {
+            if (!gameActive) return;
+            const x = rand(50, width() - 50);
+            const baseSpeed = rand(180, 280);
+            const fallSpeed = isSlowMode ? baseSpeed * 0.4 : baseSpeed * getDifficultyMultiplier();
+
+            const poop = add([
+                rect(1, 1), pos(x, -30), anchor("center"),
+                area({ shape: new Rect(vec2(0, 0), 30, 35) }),
+                opacity(0), move(DOWN, fallSpeed), "poop",
+            ]);
+
+            const poopColors = [139, 90, 43];
+            const parts = [
+                [circle(14), 12], [circle(11), 0], [circle(7), -10],
+            ];
+            parts.forEach(([shape, offsetY]) => {
+                add([shape, pos(0, 0), anchor("center"), color(...poopColors), z(3)])
+                .onUpdate(function() {
+                    if (poop.exists()) this.pos = poop.pos.add(0, offsetY);
+                    else destroy(this);
+                });
+            });
+
+            add([polygon([vec2(0, -8), vec2(-4, 0), vec2(4, 0)]), pos(0, 0), anchor("center"), color(...poopColors), z(4)])
+            .onUpdate(function() {
+                if (poop.exists()) this.pos = poop.pos.add(0, -18);
+                else destroy(this);
+            });
+
+            add([circle(4), pos(0, 0), anchor("center"), color(180, 140, 100), z(5)])
+            .onUpdate(function() {
+                if (poop.exists()) this.pos = poop.pos.add(-4, -2);
+                else destroy(this);
+            });
+        }
+
+        // === ぶどう生成（種類別） ===
+        function spawnGrape(type = "purple") {
+            if (!gameActive) return;
+            const x = rand(50, width() - 50);
+            const baseSpeed = rand(80, 140);
+            const fallSpeed = isSlowMode ? baseSpeed * 0.4 : baseSpeed * getDifficultyMultiplier();
+
+            let grapeColor, highlightColor, tag, points;
+            switch(type) {
+                case "green":
+                    grapeColor = [100, 180, 80];
+                    highlightColor = [150, 220, 130];
+                    tag = "greenGrape";
+                    points = 2;
+                    break;
+                case "golden":
+                    grapeColor = [255, 215, 0];
+                    highlightColor = [255, 255, 150];
+                    tag = "goldenGrape";
+                    points = 5;
+                    break;
+                case "rotten":
+                    grapeColor = [80, 60, 40];
+                    highlightColor = [100, 80, 60];
+                    tag = "rottenGrape";
+                    points = -1;
+                    break;
+                default:
+                    grapeColor = [130, 40, 150];
+                    highlightColor = [180, 100, 200];
+                    tag = "grape";
+                    points = 1;
+            }
+
+            const grape = add([
+                rect(1, 1), pos(x, -30), anchor("center"),
+                area({ shape: new Rect(vec2(0, 0), 35, 45) }),
+                opacity(0), move(DOWN, fallSpeed), tag,
+                { points: points, grapeType: type },
+            ]);
+
+            // 茎
+            add([rect(4, 15), pos(0, 0), anchor("center"), color(34, 139, 34), z(1)])
+            .onUpdate(function() {
+                if (grape.exists()) this.pos = grape.pos.add(0, -25);
+                else destroy(this);
+            });
+
+            // 葉
+            if (type !== "rotten") {
+                add([polygon([vec2(0, 0), vec2(12, -8), vec2(8, 5)]), pos(0, 0), anchor("center"), color(50, 180, 50), z(2)])
+                .onUpdate(function() {
+                    if (grape.exists()) this.pos = grape.pos.add(5, -20);
+                    else destroy(this);
+                });
+            }
+
+            // ぶどうの粒
+            const positions = [[0, -12], [-10, 0], [10, 0], [-15, 12], [0, 12], [15, 12], [-8, 24], [8, 24]];
+            positions.forEach(([ox, oy]) => {
+                add([circle(9), pos(0, 0), anchor("center"), color(...grapeColor), z(3)])
+                .onUpdate(function() {
+                    if (grape.exists()) {
+                        this.pos = grape.pos.add(ox, oy);
+                        // マグネット効果
+                        if (hasMagnet && grape.grapeType !== "rotten") {
+                            const dist = grape.pos.dist(vec2(currentX, playerY));
+                            if (dist < 150) {
+                                const dir = vec2(currentX, playerY + 15).sub(grape.pos).unit();
+                                grape.pos = grape.pos.add(dir.scale(3));
+                            }
+                        }
+                    } else {
+                        destroy(this);
+                    }
+                });
+
+                add([circle(3), pos(0, 0), anchor("center"), color(...highlightColor), z(4)])
+                .onUpdate(function() {
+                    if (grape.exists()) this.pos = grape.pos.add(ox - 3, oy - 3);
+                    else destroy(this);
+                });
+            });
+
+            // 金ぶどうはキラキラ
+            if (type === "golden") {
+                add([text("★", { size: 16 }), pos(0, 0), anchor("center"), color(255, 255, 0), z(5)])
+                .onUpdate(function() {
+                    if (grape.exists()) {
+                        this.pos = grape.pos.add(0, -35);
+                        this.opacity = 0.5 + Math.sin(time() * 10) * 0.5;
+                    } else {
+                        destroy(this);
+                    }
+                });
+            }
+
+            // 腐ったぶどうはハエ
+            if (type === "rotten") {
+                add([text("🪰", { size: 12 }), pos(0, 0), anchor("center"), z(5)])
+                .onUpdate(function() {
+                    if (grape.exists()) {
+                        this.pos = grape.pos.add(Math.sin(time() * 15) * 15, -20 + Math.cos(time() * 12) * 10);
+                    } else {
+                        destroy(this);
+                    }
+                });
+            }
+        }
+
+        // === パワーアップアイテム ===
+        function spawnPowerUp(type) {
+            if (!gameActive) return;
+            const x = rand(60, width() - 60);
+            const fallSpeed = isSlowMode ? 60 : 100;
+
+            let emoji, itemColor, tag;
+            switch(type) {
+                case "shield":
+                    emoji = "🛡️";
+                    itemColor = [0, 200, 255];
+                    tag = "shieldItem";
+                    break;
+                case "magnet":
+                    emoji = "🧲";
+                    itemColor = [255, 100, 100];
+                    tag = "magnetItem";
+                    break;
+                case "slow":
+                    emoji = "⏱️";
+                    itemColor = [200, 200, 0];
+                    tag = "slowItem";
+                    break;
+            }
+
+            const item = add([
+                circle(25), pos(x, -30), anchor("center"),
+                area(), color(...itemColor), opacity(0.8),
+                move(DOWN, fallSpeed), tag, z(5),
+            ]);
+
+            add([text(emoji, { size: 28 }), pos(0, 0), anchor("center"), z(6)])
+            .onUpdate(function() {
+                if (item.exists()) {
+                    this.pos = item.pos;
+                    item.opacity = 0.6 + Math.sin(time() * 8) * 0.3;
+                } else {
+                    destroy(this);
+                }
+            });
+        }
+
+        // === 鳥イベント ===
+        function spawnBird() {
+            if (!gameActive) return;
+
+            playSound("bird");
+
+            // 警告
+            add([
+                text("🐦 鳥が来た！", { size: 28 }),
+                pos(width() / 2, 200),
+                anchor("center"),
+                color(255, 100, 0),
+                lifespan(1.5),
+                z(15),
+            ]);
+
+            wait(1, () => {
+                if (!gameActive) return;
+                const startX = rand() > 0.5 ? -50 : width() + 50;
+                const dir = startX < 0 ? 1 : -1;
+
+                const bird = add([
+                    rect(1, 1), pos(startX, 120), anchor("center"), z(8),
+                    { dir: dir },
+                ]);
+
+                // 鳥の体
+                add([circle(20), pos(0, 0), anchor("center"), color(80, 60, 40), z(8)])
+                .onUpdate(function() {
+                    if (bird.exists()) {
+                        bird.pos.x += bird.dir * 4;
+                        this.pos = bird.pos;
+                        // ぶどうを落とす
+                        if (rand() < 0.08) {
+                            spawnGrape(["purple", "green", "golden"][Math.floor(rand(0, 3))]);
+                        }
+                        if (bird.pos.x < -100 || bird.pos.x > width() + 100) {
+                            destroy(bird);
+                        }
+                    } else {
+                        destroy(this);
+                    }
+                });
+
+                // くちばし
+                add([polygon([vec2(0, 0), vec2(15 * dir, -5), vec2(15 * dir, 5)]), pos(0, 0), anchor("center"), color(255, 200, 0), z(9)])
+                .onUpdate(function() {
+                    if (bird.exists()) this.pos = bird.pos.add(15 * bird.dir, 0);
+                    else destroy(this);
+                });
+
+                // 羽
+                add([polygon([vec2(0, 0), vec2(-20, -15), vec2(-10, 0)]), pos(0, 0), anchor("center"), color(60, 40, 20), z(7)])
+                .onUpdate(function() {
+                    if (bird.exists()) {
+                        const wingY = Math.sin(time() * 20) * 10;
+                        this.pos = bird.pos.add(0, wingY - 10);
+                    } else {
+                        destroy(this);
+                    }
+                });
+
+                // 目
+                add([circle(4), pos(0, 0), anchor("center"), color(255, 255, 255), z(10)])
+                .onUpdate(function() {
+                    if (bird.exists()) this.pos = bird.pos.add(8 * bird.dir, -5);
+                    else destroy(this);
+                });
+            });
+        }
+
+        // === スポーン管理 ===
+        loop(1.5, () => {
+            if (!gameActive) return;
+            const r = rand();
+            if (r < 0.6) spawnGrape("purple");
+            else if (r < 0.8) spawnGrape("green");
+            else if (r < 0.9) spawnGrape("rotten");
+            else spawnGrape("golden");
+        });
+
+        loop(3, () => {
+            if (rand() > 0.3) spawnPoop();
+        });
+
+        loop(8, () => {
+            if (!gameActive) return;
+            const r = rand();
+            if (r < 0.33) spawnPowerUp("shield");
+            else if (r < 0.66) spawnPowerUp("magnet");
+            else spawnPowerUp("slow");
+        });
+
+        loop(20, () => {
+            if (gameActive && score >= 5) spawnBird();
+        });
+
+        // === 操作 ===
+        const speed = 5;
+        onKeyDown("left", () => movePlayer(-speed));
+        onKeyDown("right", () => movePlayer(speed));
+
+        // === ゲームパッド対応（Switch Proコン等） ===
+        let gamepadConnected = false;
+
+        window.addEventListener("gamepadconnected", (e) => {
+            gamepadConnected = true;
+            console.log("コントローラー接続: " + e.gamepad.id);
+            // BGM開始（ユーザー操作として認識）
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            startBGM();
+        });
+
+        window.addEventListener("gamepaddisconnected", (e) => {
+            gamepadConnected = false;
+            console.log("コントローラー切断: " + e.gamepad.id);
+        });
+
+        // ゲームパッド入力をチェック
+        onUpdate(() => {
+            const gamepads = navigator.getGamepads();
+            if (!gamepads) return;
+
+            for (const gamepad of gamepads) {
+                if (!gamepad) continue;
+
+                // 左スティック（横方向）
+                const leftStickX = gamepad.axes[0];
+                if (Math.abs(leftStickX) > 0.2) { // デッドゾーン
+                    movePlayer(leftStickX * speed);
+                }
+
+                // 十字キー（D-pad）
+                // Switch Proコンの十字キー: buttons[12]=上, [13]=下, [14]=左, [15]=右
+                if (gamepad.buttons[14] && gamepad.buttons[14].pressed) {
+                    movePlayer(-speed);
+                }
+                if (gamepad.buttons[15] && gamepad.buttons[15].pressed) {
+                    movePlayer(speed);
+                }
+            }
+        });
+
+        // === タッチ操作（iPhone/iPad対応） ===
+        let touchLeftPressed = false;
+        let touchRightPressed = false;
+
+        // DOMロード後にボタンイベントを設定
+        setTimeout(() => {
+            const btnLeft = document.getElementById('btn-left');
+            const btnRight = document.getElementById('btn-right');
+
+            if (btnLeft && btnRight) {
+                // 左ボタン
+                btnLeft.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchLeftPressed = true;
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    startBGM();
+                }, { passive: false });
+
+                btnLeft.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchLeftPressed = false;
+                }, { passive: false });
+
+                btnLeft.addEventListener('touchcancel', () => touchLeftPressed = false);
+
+                btnLeft.addEventListener('mousedown', () => {
+                    touchLeftPressed = true;
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    startBGM();
+                });
+
+                btnLeft.addEventListener('mouseup', () => touchLeftPressed = false);
+                btnLeft.addEventListener('mouseleave', () => touchLeftPressed = false);
+
+                // 右ボタン
+                btnRight.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchRightPressed = true;
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    startBGM();
+                }, { passive: false });
+
+                btnRight.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchRightPressed = false;
+                }, { passive: false });
+
+                btnRight.addEventListener('touchcancel', () => touchRightPressed = false);
+
+                btnRight.addEventListener('mousedown', () => {
+                    touchRightPressed = true;
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    startBGM();
+                });
+
+                btnRight.addEventListener('mouseup', () => touchRightPressed = false);
+                btnRight.addEventListener('mouseleave', () => touchRightPressed = false);
+            }
+        }, 100);
+
+        // タッチ入力をゲームループで処理
+        onUpdate(() => {
+            if (touchLeftPressed) movePlayer(-speed);
+            if (touchRightPressed) movePlayer(speed);
+        });
+
+        // === 衝突処理 ===
+        function catchGrape(grape) {
+            const points = grape.points;
+            const multiplier = Math.min(combo + 1, 5);
+
+            if (points > 0) {
+                combo++;
+                if (combo > maxCombo) maxCombo = combo;
+                score += points * multiplier;
+
+                // 効果音
+                if (points === 5) {
+                    playSound("golden");
+                } else if (combo >= 3) {
+                    playSound("combo");
+                } else {
+                    playSound("catch");
+                }
+
+                add([
+                    text("+" + (points * multiplier), { size: 24 }),
+                    pos(currentX, playerY - 50),
+                    anchor("center"),
+                    color(points === 5 ? 255 : 0, points >= 2 ? 200 : 150, 0),
+                    lifespan(0.8),
+                    move(UP, 40),
+                    z(10),
+                ]);
+
+                mouth.width = 20;
+                wait(0.3, () => mouth.width = 15);
+            } else {
+                // 腐ったぶどう
+                if (!hasShield) {
+                    missed++;
+                    combo = 0;
+                    playSound("damage");
+                    add([
+                        text("うえっ!", { size: 24 }),
+                        pos(currentX, playerY - 50),
+                        anchor("center"),
+                        color(80, 60, 40),
+                        lifespan(0.8),
+                        move(UP, 40),
+                        z(10),
+                    ]);
+                    head.color = rgb(180, 200, 160);
+                    wait(0.5, () => head.color = rgb(255, 220, 180));
+                } else {
+                    add([
+                        text("ガード!", { size: 20 }),
+                        pos(currentX, playerY - 50),
+                        anchor("center"),
+                        color(0, 200, 255),
+                        lifespan(0.5),
+                        z(10),
+                    ]);
+                }
+            }
+
+            destroy(grape);
+            updateUI();
+            if (missed >= maxMissed) gameOver();
+        }
+
+        hitbox.onCollide("grape", catchGrape);
+        hitbox.onCollide("greenGrape", catchGrape);
+        hitbox.onCollide("goldenGrape", catchGrape);
+        hitbox.onCollide("rottenGrape", catchGrape);
+
+        hitbox.onCollide("poop", (poop) => {
+            destroy(poop);
+            if (hasShield) {
+                add([text("ガード!", { size: 20 }), pos(currentX, playerY - 50), anchor("center"), color(0, 200, 255), lifespan(0.5), z(10)]);
+                return;
+            }
+
+            missed++;
+            combo = 0;
+            updateUI();
+            playSound("damage");
+
+            add([text("うわっ!", { size: 24 }), pos(currentX, playerY - 50), anchor("center"), color(139, 90, 43), lifespan(0.8), move(UP, 40), z(10)]);
+
+            const flash = add([rect(width(), height()), pos(0, 0), color(255, 0, 0), opacity(0.3), z(15)]);
+            wait(0.15, () => destroy(flash));
+
+            head.color = rgb(200, 180, 160);
+            mouth.color = rgb(100, 100, 200);
+            wait(0.5, () => {
+                head.color = rgb(255, 220, 180);
+                mouth.color = rgb(200, 100, 100);
+            });
+
+            if (missed >= maxMissed) gameOver();
+        });
+
+        // パワーアップ取得
+        hitbox.onCollide("shieldItem", (item) => {
+            destroy(item);
+            hasShield = true;
+            shieldEffect.opacity = 0.3;
+            playSound("powerup");
+            add([text("シールド発動!", { size: 24 }), pos(width()/2, 300), anchor("center"), color(0, 200, 255), lifespan(1), z(15)]);
+            updateUI();
+            wait(8, () => {
+                hasShield = false;
+                shieldEffect.opacity = 0;
+                updateUI();
+            });
+        });
+
+        hitbox.onCollide("magnetItem", (item) => {
+            destroy(item);
+            hasMagnet = true;
+            playSound("powerup");
+            add([text("マグネット発動!", { size: 24 }), pos(width()/2, 300), anchor("center"), color(255, 100, 100), lifespan(1), z(15)]);
+            updateUI();
+            wait(10, () => {
+                hasMagnet = false;
+                updateUI();
+            });
+        });
+
+        hitbox.onCollide("slowItem", (item) => {
+            destroy(item);
+            isSlowMode = true;
+            playSound("powerup");
+            add([text("スローモード!", { size: 24 }), pos(width()/2, 300), anchor("center"), color(200, 200, 0), lifespan(1), z(15)]);
+            updateUI();
+            wait(6, () => {
+                isSlowMode = false;
+                updateUI();
+            });
+        });
+
+        // 画面外処理
+        onUpdate("poop", (p) => { if (p.pos.y > height() + 40) destroy(p); });
+        onUpdate("shieldItem", (p) => { if (p.pos.y > height() + 40) destroy(p); });
+        onUpdate("magnetItem", (p) => { if (p.pos.y > height() + 40) destroy(p); });
+        onUpdate("slowItem", (p) => { if (p.pos.y > height() + 40) destroy(p); });
+
+        ["grape", "greenGrape", "goldenGrape", "rottenGrape"].forEach(tag => {
+            onUpdate(tag, (grape) => {
+                if (grape.pos.y > height() + 40) {
+                    destroy(grape);
+                    // ぶどうが落ちてもダメージなし（コンボはリセット）
+                    if (grape.points > 0 && combo > 0) {
+                        combo = 0;
+                        updateUI();
+                    }
+                }
+            });
+        });
+
+        // === ゲームオーバー ===
+        function gameOver() {
+            gameActive = false;
+            stopBGM();
+            playSound("gameover");
+            destroyAll("grape");
+            destroyAll("greenGrape");
+            destroyAll("goldenGrape");
+            destroyAll("rottenGrape");
+            destroyAll("poop");
+            destroyAll("shieldItem");
+            destroyAll("magnetItem");
+            destroyAll("slowItem");
+
+            // ハイスコア更新
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('grapeGameHighScore', highScore);
+            }
+
+            add([rect(width(), height()), pos(0, 0), color(0, 0, 0), opacity(0.8), z(20)]);
+            add([text("ゲームオーバー", { size: 40 }), pos(width()/2, height()/2 - 80), anchor("center"), color(255, 255, 255), z(21)]);
+            add([text("スコア: " + score, { size: 32 }), pos(width()/2, height()/2 - 30), anchor("center"), color(255, 255, 0), z(21)]);
+            add([text("最大コンボ: " + maxCombo, { size: 24 }), pos(width()/2, height()/2 + 10), anchor("center"), color(255, 150, 0), z(21)]);
+
+            if (score >= highScore) {
+                add([text("🎉 ハイスコア更新! 🎉", { size: 24 }), pos(width()/2, height()/2 + 45), anchor("center"), color(255, 200, 0), z(21)]);
+            } else {
+                add([text("ハイスコア: " + highScore, { size: 20 }), pos(width()/2, height()/2 + 45), anchor("center"), color(200, 200, 200), z(21)]);
+            }
+
+            add([text(isMobile ? "タップでリスタート" : "Rキー / Aボタンでリスタート", { size: 20 }), pos(width()/2, height()/2 + 90), anchor("center"), color(255, 255, 255), z(21)]);
+
+            // リスタートボタン（モバイル用）
+            const restartBtn = add([
+                rect(200, 60),
+                pos(width()/2, height()/2 + 150),
+                anchor("center"),
+                color(138, 43, 226),
+                area(),
+                z(22),
+                "restartBtn",
+            ]);
+            add([text("🔄 リスタート", { size: 24 }), pos(width()/2, height()/2 + 150), anchor("center"), color(255, 255, 255), z(23)]);
+
+            // タップ/クリックでリスタート
+            onClick("restartBtn", () => location.reload());
+
+            onKeyPress("r", () => location.reload());
+
+            // ProコンのAボタンでリスタート
+            const restartLoop = setInterval(() => {
+                const gamepads = navigator.getGamepads();
+                if (!gamepads) return;
+                for (const gamepad of gamepads) {
+                    if (!gamepad) continue;
+                    // Switch ProコンのAボタン（buttons[1]）またはBボタン（buttons[0]）
+                    if ((gamepad.buttons[1] && gamepad.buttons[1].pressed) ||
+                        (gamepad.buttons[0] && gamepad.buttons[0].pressed)) {
+                        clearInterval(restartLoop);
+                        location.reload();
+                    }
+                }
+            }, 100);
+        }
+    </script>
+    <div id="touch-controls">
+        <button class="touch-btn" id="btn-left">◀</button>
+        <button class="touch-btn" id="btn-right">▶</button>
+    </div>
+</body>
+</html>
