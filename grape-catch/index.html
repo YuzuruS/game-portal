@@ -1195,8 +1195,39 @@
             ]);
             add([text("🔄 リスタート", { size: 24 }), pos(width()/2, height()/2 + 150), anchor("center"), color(255, 255, 255), z(23)]);
 
-            // タップ/クリックでリスタート
+            // タップ/クリックでリスタート（モバイル対応強化）
             onClick("restartBtn", () => location.reload());
+
+            // キャンバスへの直接タッチでもリスタート（モバイル用フォールバック）
+            const gameCanvas = document.querySelector('canvas');
+            if (gameCanvas) {
+                const restartHandler = (e) => {
+                    const rect = gameCanvas.getBoundingClientRect();
+                    const scaleX = gameCanvas.width / rect.width;
+                    const scaleY = gameCanvas.height / rect.height;
+
+                    let clientX, clientY;
+                    if (e.touches && e.touches[0]) {
+                        clientX = e.touches[0].clientX;
+                        clientY = e.touches[0].clientY;
+                    } else {
+                        clientX = e.clientX;
+                        clientY = e.clientY;
+                    }
+
+                    const x = (clientX - rect.left) * scaleX;
+                    const y = (clientY - rect.top) * scaleY;
+
+                    // リスタートボタンの範囲をチェック（中心: width/2, height/2+150, サイズ: 200x60）
+                    const btnX = width() / 2;
+                    const btnY = height() / 2 + 150;
+                    if (x >= btnX - 100 && x <= btnX + 100 && y >= btnY - 30 && y <= btnY + 30) {
+                        location.reload();
+                    }
+                };
+                gameCanvas.addEventListener('touchend', restartHandler);
+                gameCanvas.addEventListener('click', restartHandler);
+            }
 
             onKeyPress("r", () => location.reload());
 
