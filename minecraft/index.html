@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #87CEEB;
+        }
+        canvas {
+            display: block;
+            cursor: none;
+        }
+        #ui {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            z-index: 100;
+            pointer-events: none;
+            font-size: 14px;
+        }
+        #gamepad-status {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 100, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 100;
+            pointer-events: none;
+            font-size: 12px;
+            display: none;
+        }
+        #gamepad-status.connected {
+            display: block;
+        }
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+            box-shadow: 0 0 2px black;
+        }
+        #crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+        #crosshair::after {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+        #inventory {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            z-index: 100;
+        }
+        .inventory-slot {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .inventory-slot.active {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+        .inventory-slot:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        #instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 200;
+            max-width: 500px;
+        }
+        #instructions h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        #instructions p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        #instructions button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 18px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        #instructions button:hover {
+            background: #45a049;
+        }
+        .controls {
+            text-align: left;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        .controls div {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        Position: <span id="position">0, 0, 0</span> |
+        <span id="mode-indicator" style="color: #4CAF50;">✈️ 飛行モード</span>
+    </div>
+    <div id="gamepad-status">
+        🎮 <span id="gamepad-name">Switch Pro Controller</span> 接続中
+    </div>
+    <div id="crosshair"></div>
+    <div id="inventory">
+        <div class="inventory-slot active" data-block="grass">🌱</div>
+        <div class="inventory-slot" data-block="dirt">🟫</div>
+        <div class="inventory-slot" data-block="stone">⬜</div>
+        <div class="inventory-slot" data-block="wood">🟧</div>
+        <div class="inventory-slot" data-block="leaves">🌿</div>
+        <div class="inventory-slot" data-block="sand">🟨</div>
+        <div class="inventory-slot" data-block="water">💧</div>
+        <div class="inventory-slot" data-block="glass">🔷</div>
+    </div>
+
+    <div id="instructions">
+        <h2>🎮 Minecraft Clone</h2>
+        <p>クリックしてゲームを開始</p>
+        <p id="gamepad-start-hint" style="display: none; color: #4CAF50; margin-top: 10px; font-weight: bold;">
+            または Aボタン を押してスタート
+        </p>
+        <div class="controls">
+            <div><strong>移動:</strong> W A S D / 左スティック</div>
+            <div><strong>視点:</strong> マウス移動 / 右スティック</div>
+            <div><strong>上昇:</strong> Space / Aボタン（飛行時）</div>
+            <div><strong>下降:</strong> Shift / ZLボタン（飛行時）</div>
+            <div><strong>飛行切替:</strong> F / Yボタン</div>
+            <div><strong>ブロック破壊:</strong> 左クリック / Bボタン</div>
+            <div><strong>ブロック配置:</strong> 右クリック / Xボタン</div>
+            <div><strong>ブロック選択:</strong> 1-8, マウスホイール, 十字キー, L/R</div>
+            <div><strong>終了:</strong> ESC / +ボタン</div>
+        </div>
+        <button onclick="startGame()">ゲームスタート</button>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // ゲーム状態
+        const gameState = {
+            world: new Map(),
+            currentBlock: 'grass',
+            velocity: new THREE.Vector3(),
+            isJumping: false,
+            canJump: false,
+            gamepad: null,
+            gamepadButtons: {},
+            gamepadPrevButtons: {},
+            flyMode: true, // クリエイティブモード（飛行）
+            mobs: [] // モブの配列
+        };
+
+        // シーン設定
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 0, 200);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 20, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // ライト設定
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        sunLight.position.set(50, 100, 50);
+        sunLight.castShadow = true;
+        sunLight.shadow.camera.left = -100;
+        sunLight.shadow.camera.right = 100;
+        sunLight.shadow.camera.top = 100;
+        sunLight.shadow.camera.bottom = -100;
+        sunLight.shadow.camera.far = 200;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        scene.add(sunLight);
+
+        // コントロール
+        const controls = new PointerLockControls(camera, document.body);
+
+        // ブロックテクスチャマテリアル
+        const blockMaterials = {
+            grass: [
+                new THREE.MeshLambertMaterial({ color: 0x3d8f3d }), // 右
+                new THREE.MeshLambertMaterial({ color: 0x3d8f3d }), // 左
+                new THREE.MeshLambertMaterial({ color: 0x7ec850 }), // 上
+                new THREE.MeshLambertMaterial({ color: 0x6b4423 }), // 下
+                new THREE.MeshLambertMaterial({ color: 0x3d8f3d }), // 前
+                new THREE.MeshLambertMaterial({ color: 0x3d8f3d })  // 後
+            ],
+            dirt: new THREE.MeshLambertMaterial({ color: 0x6b4423 }),
+            stone: new THREE.MeshLambertMaterial({ color: 0x808080 }),
+            wood: new THREE.MeshLambertMaterial({ color: 0x8b6914 }),
+            leaves: new THREE.MeshLambertMaterial({ color: 0x228b22, transparent: true, opacity: 0.8 }),
+            sand: new THREE.MeshLambertMaterial({ color: 0xc2b280 }),
+            water: new THREE.MeshLambertMaterial({ color: 0x1e90ff, transparent: true, opacity: 0.6 }),
+            glass: new THREE.MeshLambertMaterial({ color: 0xadd8e6, transparent: true, opacity: 0.4 })
+        };
+
+        // ブロックジオメトリ
+        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+
+        // 簡易的なノイズ生成（地形用）
+        function noise2D(x, z) {
+            const X = Math.floor(x) & 255;
+            const Z = Math.floor(z) & 255;
+            return (Math.sin(X * 12.9898 + Z * 78.233) * 43758.5453123) % 1;
+        }
+
+        function getHeight(x, z) {
+            const scale = 0.1;
+            const n1 = noise2D(x * scale, z * scale);
+            const n2 = noise2D(x * scale * 2, z * scale * 2) * 0.5;
+            return Math.floor((n1 + n2) * 8) + 5;
+        }
+
+        // ワールド座標をキーに変換
+        function blockKey(x, y, z) {
+            return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+        }
+
+        // ブロック追加
+        function addBlock(x, y, z, type) {
+            const key = blockKey(x, y, z);
+            if (gameState.world.has(key)) return;
+
+            const material = blockMaterials[type];
+            const mesh = new THREE.Mesh(blockGeometry, material);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.blockType = type;
+
+            scene.add(mesh);
+            gameState.world.set(key, mesh);
+        }
+
+        // ブロック削除
+        function removeBlock(x, y, z) {
+            const key = blockKey(x, y, z);
+            const block = gameState.world.get(key);
+            if (block) {
+                scene.remove(block);
+                gameState.world.delete(key);
+            }
+        }
+
+        // ワールド生成
+        function generateWorld() {
+            const size = 30;
+            for (let x = -size; x < size; x++) {
+                for (let z = -size; z < size; z++) {
+                    const height = getHeight(x, z);
+
+                    // 地形生成
+                    for (let y = 0; y < height; y++) {
+                        if (y === height - 1) {
+                            addBlock(x, y, z, 'grass');
+                        } else if (y > height - 4) {
+                            addBlock(x, y, z, 'dirt');
+                        } else {
+                            addBlock(x, y, z, 'stone');
+                        }
+                    }
+
+                    // ランダムに木を生成
+                    if (Math.random() < 0.02 && height > 6) {
+                        const treeHeight = 5;
+                        // 幹
+                        for (let i = 0; i < treeHeight; i++) {
+                            addBlock(x, height + i, z, 'wood');
+                        }
+                        // 葉
+                        for (let dx = -2; dx <= 2; dx++) {
+                            for (let dz = -2; dz <= 2; dz++) {
+                                for (let dy = 0; dy < 3; dy++) {
+                                    if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && dy < 2) continue;
+                                    addBlock(x + dx, height + treeHeight + dy, z + dz, 'leaves');
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // モブスポーン
+            console.log('Spawning mobs...');
+
+            // 友好的モブをスポーン（各10体）
+            for (let i = 0; i < 10; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('cow', x, z);
+            }
+
+            for (let i = 0; i < 8; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('pig', x, z);
+            }
+
+            for (let i = 0; i < 8; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('sheep', x, z);
+            }
+
+            for (let i = 0; i < 6; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('chicken', x, z);
+            }
+
+            // 敵対的モブをスポーン（各5体）
+            for (let i = 0; i < 5; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('zombie', x, z);
+            }
+
+            for (let i = 0; i < 4; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('skeleton', x, z);
+            }
+
+            for (let i = 0; i < 3; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                spawnMob('creeper', x, z);
+            }
+
+            console.log(`Spawned ${gameState.mobs.length} mobs`);
+        }
+
+        // モブシステム
+        class Mob {
+            constructor(x, y, z, type) {
+                this.type = type;
+                this.position = new THREE.Vector3(x, y, z);
+                this.velocity = new THREE.Vector3();
+                this.health = 20;
+                this.maxHealth = 20;
+                this.speed = 2;
+                this.target = null;
+                this.state = 'idle'; // idle, walking, attacking
+                this.stateTimer = 0;
+
+                // モデル作成
+                this.group = new THREE.Group();
+                this.createModel();
+                this.group.position.copy(this.position);
+                scene.add(this.group);
+            }
+
+            createModel() {
+                // 子クラスでオーバーライド
+            }
+
+            update(delta) {
+                this.stateTimer += delta;
+
+                // AI更新
+                this.updateAI(delta);
+
+                // 重力
+                this.velocity.y -= 20 * delta;
+
+                // 移動
+                this.position.add(this.velocity.clone().multiplyScalar(delta));
+
+                // 地面衝突（簡易）
+                if (this.position.y < getHeight(this.position.x, this.position.z) + 1) {
+                    this.position.y = getHeight(this.position.x, this.position.z) + 1;
+                    this.velocity.y = 0;
+                }
+
+                // 位置同期
+                this.group.position.copy(this.position);
+
+                // アニメーション
+                if (this.velocity.x !== 0 || this.velocity.z !== 0) {
+                    this.group.rotation.y = Math.atan2(this.velocity.x, this.velocity.z);
+                }
+            }
+
+            updateAI(delta) {
+                // 子クラスでオーバーライド
+            }
+
+            takeDamage(amount) {
+                this.health -= amount;
+                if (this.health <= 0) {
+                    this.die();
+                }
+            }
+
+            die() {
+                scene.remove(this.group);
+                const index = gameState.mobs.indexOf(this);
+                if (index > -1) {
+                    gameState.mobs.splice(index, 1);
+                }
+            }
+
+            distanceToPlayer() {
+                return this.position.distanceTo(camera.position);
+            }
+        }
+
+        // 友好的モブ
+        class PassiveMob extends Mob {
+            createModel() {
+                const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 1);
+                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const legGeo = new THREE.BoxGeometry(0.2, 0.5, 0.2);
+
+                let bodyColor, headColor;
+                if (this.type === 'cow') {
+                    bodyColor = 0x8B4513; // 茶色
+                    headColor = 0x654321;
+                } else if (this.type === 'pig') {
+                    bodyColor = 0xFFB6C1; // ピンク
+                    headColor = 0xFFB6C1;
+                } else if (this.type === 'sheep') {
+                    bodyColor = 0xFFFFFF; // 白
+                    headColor = 0xE0E0E0;
+                } else if (this.type === 'chicken') {
+                    bodyColor = 0xFFFFFF;
+                    headColor = 0xFF0000; // 赤いトサカ
+                }
+
+                const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+                const headMat = new THREE.MeshLambertMaterial({ color: headColor });
+                const legMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+
+                // 体
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.4;
+                body.castShadow = true;
+                this.group.add(body);
+
+                // 頭
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.set(0, 0.7, -0.6);
+                head.castShadow = true;
+                this.group.add(head);
+
+                // 足（4本）
+                const positions = [
+                    [-0.25, -0.25, 0.3],
+                    [0.25, -0.25, 0.3],
+                    [-0.25, -0.25, -0.3],
+                    [0.25, -0.25, -0.3]
+                ];
+
+                positions.forEach(pos => {
+                    const leg = new THREE.Mesh(legGeo, legMat);
+                    leg.position.set(pos[0], pos[1], pos[2]);
+                    leg.castShadow = true;
+                    this.group.add(leg);
+                });
+            }
+
+            updateAI(delta) {
+                // ランダムウォーク
+                if (this.stateTimer > 3) {
+                    this.stateTimer = 0;
+                    if (Math.random() < 0.3) {
+                        this.state = 'walking';
+                        const angle = Math.random() * Math.PI * 2;
+                        this.velocity.x = Math.cos(angle) * this.speed;
+                        this.velocity.z = Math.sin(angle) * this.speed;
+                    } else {
+                        this.state = 'idle';
+                        this.velocity.x = 0;
+                        this.velocity.z = 0;
+                    }
+                }
+            }
+        }
+
+        // 敵対的モブ
+        class HostileMob extends Mob {
+            constructor(x, y, z, type) {
+                super(x, y, z, type);
+                this.attackDamage = 3;
+                this.attackCooldown = 0;
+                this.detectionRange = 20;
+                this.attackRange = 2;
+            }
+
+            createModel() {
+                const bodyGeo = new THREE.BoxGeometry(0.6, 1.5, 0.3);
+                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const armGeo = new THREE.BoxGeometry(0.2, 1, 0.2);
+                const legGeo = new THREE.BoxGeometry(0.2, 1, 0.2);
+
+                let bodyColor, headColor;
+                if (this.type === 'zombie') {
+                    bodyColor = 0x00AA00; // 緑
+                    headColor = 0x00AA00;
+                } else if (this.type === 'skeleton') {
+                    bodyColor = 0xCCCCCC; // 白骨
+                    headColor = 0xCCCCCC;
+                } else if (this.type === 'creeper') {
+                    bodyColor = 0x0D9400; // クリーパー緑
+                    headColor = 0x0D9400;
+                }
+
+                const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+                const headMat = new THREE.MeshLambertMaterial({ color: headColor });
+
+                // 体
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.75;
+                body.castShadow = true;
+                this.group.add(body);
+
+                // 頭
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 1.75;
+                head.castShadow = true;
+                this.group.add(head);
+
+                // 目（敵対的な赤い目）
+                const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.05);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.15, 1.8, -0.28);
+                this.group.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.15, 1.8, -0.28);
+                this.group.add(rightEye);
+
+                // 腕
+                const leftArm = new THREE.Mesh(armGeo, bodyMat);
+                leftArm.position.set(-0.45, 0.75, 0);
+                leftArm.castShadow = true;
+                this.group.add(leftArm);
+
+                const rightArm = new THREE.Mesh(armGeo, bodyMat);
+                rightArm.position.set(0.45, 0.75, 0);
+                rightArm.castShadow = true;
+                this.group.add(rightArm);
+
+                // 足
+                const leftLeg = new THREE.Mesh(legGeo, bodyMat);
+                leftLeg.position.set(-0.15, -0.5, 0);
+                leftLeg.castShadow = true;
+                this.group.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(legGeo, bodyMat);
+                rightLeg.position.set(0.15, -0.5, 0);
+                rightLeg.castShadow = true;
+                this.group.add(rightLeg);
+            }
+
+            updateAI(delta) {
+                const distToPlayer = this.distanceToPlayer();
+
+                if (this.attackCooldown > 0) {
+                    this.attackCooldown -= delta;
+                }
+
+                // プレイヤー検出
+                if (distToPlayer < this.detectionRange) {
+                    this.state = 'chasing';
+
+                    // プレイヤーに向かって移動
+                    const dirToPlayer = new THREE.Vector3()
+                        .subVectors(camera.position, this.position)
+                        .normalize();
+
+                    dirToPlayer.y = 0;
+
+                    if (distToPlayer > this.attackRange) {
+                        this.velocity.x = dirToPlayer.x * this.speed * 1.5;
+                        this.velocity.z = dirToPlayer.z * this.speed * 1.5;
+                    } else {
+                        // 攻撃範囲内
+                        this.velocity.x = 0;
+                        this.velocity.z = 0;
+
+                        if (this.attackCooldown <= 0) {
+                            this.attack();
+                            this.attackCooldown = 1.5;
+                        }
+                    }
+                } else {
+                    // ランダムウォーク
+                    if (this.stateTimer > 4) {
+                        this.stateTimer = 0;
+                        if (Math.random() < 0.2) {
+                            const angle = Math.random() * Math.PI * 2;
+                            this.velocity.x = Math.cos(angle) * this.speed;
+                            this.velocity.z = Math.sin(angle) * this.speed;
+                        } else {
+                            this.velocity.x = 0;
+                            this.velocity.z = 0;
+                        }
+                    }
+                }
+            }
+
+            attack() {
+                console.log(`${this.type} attacks! (damage: ${this.attackDamage})`);
+                // ここでプレイヤーにダメージを与える処理を追加可能
+            }
+        }
+
+        // クリーパー（特殊）
+        class Creeper extends HostileMob {
+            constructor(x, y, z) {
+                super(x, y, z, 'creeper');
+                this.explosionTimer = 0;
+                this.explosionDelay = 1.5;
+                this.isExploding = false;
+            }
+
+            updateAI(delta) {
+                const distToPlayer = this.distanceToPlayer();
+
+                if (distToPlayer < this.detectionRange) {
+                    const dirToPlayer = new THREE.Vector3()
+                        .subVectors(camera.position, this.position)
+                        .normalize();
+                    dirToPlayer.y = 0;
+
+                    if (distToPlayer > 3) {
+                        this.velocity.x = dirToPlayer.x * this.speed * 1.5;
+                        this.velocity.z = dirToPlayer.z * this.speed * 1.5;
+                        this.isExploding = false;
+                        this.explosionTimer = 0;
+                    } else {
+                        // 爆発開始
+                        this.velocity.x = 0;
+                        this.velocity.z = 0;
+                        this.isExploding = true;
+                        this.explosionTimer += delta;
+
+                        // 点滅エフェクト
+                        if (Math.floor(this.explosionTimer * 4) % 2 === 0) {
+                            this.group.scale.set(1.2, 1.2, 1.2);
+                        } else {
+                            this.group.scale.set(1, 1, 1);
+                        }
+
+                        if (this.explosionTimer >= this.explosionDelay) {
+                            this.explode();
+                        }
+                    }
+                } else {
+                    super.updateAI(delta);
+                    this.isExploding = false;
+                    this.explosionTimer = 0;
+                }
+            }
+
+            explode() {
+                console.log('💥 Creeper exploded!');
+
+                // 爆発エフェクト（周囲のブロックを破壊）
+                const explosionRadius = 3;
+                for (let dx = -explosionRadius; dx <= explosionRadius; dx++) {
+                    for (let dy = -explosionRadius; dy <= explosionRadius; dy++) {
+                        for (let dz = -explosionRadius; dz <= explosionRadius; dz++) {
+                            const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                            if (dist <= explosionRadius) {
+                                const bx = Math.floor(this.position.x + dx);
+                                const by = Math.floor(this.position.y + dy);
+                                const bz = Math.floor(this.position.z + dz);
+                                removeBlock(bx, by, bz);
+                            }
+                        }
+                    }
+                }
+
+                this.die();
+            }
+        }
+
+        // モブスポーン
+        function spawnMob(type, x, z) {
+            const y = getHeight(x, z) + 1;
+            let mob;
+
+            if (type === 'zombie') {
+                mob = new HostileMob(x, y, z, 'zombie');
+            } else if (type === 'skeleton') {
+                mob = new HostileMob(x, y, z, 'skeleton');
+            } else if (type === 'creeper') {
+                mob = new Creeper(x, y, z);
+            } else if (['cow', 'pig', 'sheep', 'chicken'].includes(type)) {
+                mob = new PassiveMob(x, y, z, type);
+            }
+
+            if (mob) {
+                gameState.mobs.push(mob);
+            }
+        }
+
+        // レイキャスト（ブロック選択用）
+        const raycaster = new THREE.Raycaster();
+        raycaster.far = 10;
+
+        function getTargetBlock() {
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(Array.from(gameState.world.values()));
+            return intersects.length > 0 ? intersects[0] : null;
+        }
+
+        function getTargetMob() {
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const mobObjects = gameState.mobs.map(mob => mob.group);
+            const intersects = raycaster.intersectObjects(mobObjects, true);
+            if (intersects.length > 0) {
+                // 最も近いモブを見つける
+                for (const mob of gameState.mobs) {
+                    if (mob.group === intersects[0].object || mob.group.children.includes(intersects[0].object)) {
+                        return mob;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // 衝突判定
+        function checkCollision(position) {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(position.x - 0.3, position.y - 1.5, position.z - 0.3),
+                new THREE.Vector3(position.x + 0.3, position.y + 0.3, position.z + 0.3)
+            );
+
+            for (const [key, block] of gameState.world) {
+                const blockBox = new THREE.Box3().setFromObject(block);
+                if (playerBox.intersectsBox(blockBox)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // キーボード入力
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+
+            // ブロック選択（数字キー）
+            if (e.code >= 'Digit1' && e.code <= 'Digit8') {
+                const index = parseInt(e.code.slice(-1)) - 1;
+                const slots = document.querySelectorAll('.inventory-slot');
+                if (slots[index]) {
+                    slots.forEach(s => s.classList.remove('active'));
+                    slots[index].classList.add('active');
+                    gameState.currentBlock = slots[index].dataset.block;
+                }
+            }
+
+            // 飛行モード切替（Fキー）
+            if (e.code === 'KeyF' && controls.isLocked) {
+                gameState.flyMode = !gameState.flyMode;
+                const modeIndicator = document.getElementById('mode-indicator');
+                if (gameState.flyMode) {
+                    modeIndicator.textContent = '✈️ 飛行モード';
+                    modeIndicator.style.color = '#4CAF50';
+                } else {
+                    modeIndicator.textContent = '🚶 歩行モード';
+                    modeIndicator.style.color = '#FFA500';
+                }
+                console.log('飛行モード:', gameState.flyMode);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // マウス入力
+        document.addEventListener('mousedown', (e) => {
+            if (!controls.isLocked) return;
+
+            if (e.button === 0) {
+                // 左クリック：モブまたはブロック攻撃
+                const targetMob = getTargetMob();
+                if (targetMob) {
+                    // モブを攻撃
+                    targetMob.takeDamage(5);
+                    console.log(`Hit ${targetMob.type}! HP: ${targetMob.health}/${targetMob.maxHealth}`);
+                } else {
+                    // ブロック破壊
+                    const target = getTargetBlock();
+                    if (target) {
+                        const pos = target.object.position;
+                        removeBlock(pos.x, pos.y, pos.z);
+                    }
+                }
+            } else if (e.button === 2) {
+                const target = getTargetBlock();
+                if (!target) return;
+                // 右クリック：ブロック配置
+                e.preventDefault();
+                const normal = target.face.normal;
+                const pos = target.object.position.clone().add(normal);
+
+                // プレイヤーの中心部分と重ならないか確認（足元と頭上は許可）
+                const playerPos = camera.position;
+                const dx = Math.abs(pos.x - playerPos.x);
+                const dy = pos.y - playerPos.y;
+                const dz = Math.abs(pos.z - playerPos.z);
+
+                // プレイヤーの中心から0.5m以内で、かつ高さが-0.5〜0.5の範囲にある場合のみブロック
+                const tooClose = dx < 0.5 && dz < 0.5 && dy > -1.5 && dy < 0.5;
+
+                if (!tooClose) {
+                    addBlock(pos.x, pos.y, pos.z, gameState.currentBlock);
+                }
+            }
+        });
+
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // マウスホイール（ブロック選択）
+        document.addEventListener('wheel', (e) => {
+            if (!controls.isLocked) return;
+
+            const slots = document.querySelectorAll('.inventory-slot');
+            const activeIndex = Array.from(slots).findIndex(s => s.classList.contains('active'));
+
+            let newIndex = activeIndex + (e.deltaY > 0 ? 1 : -1);
+            if (newIndex < 0) newIndex = slots.length - 1;
+            if (newIndex >= slots.length) newIndex = 0;
+
+            slots.forEach(s => s.classList.remove('active'));
+            slots[newIndex].classList.add('active');
+            gameState.currentBlock = slots[newIndex].dataset.block;
+        });
+
+        // インベントリスロットクリック
+        document.querySelectorAll('.inventory-slot').forEach(slot => {
+            slot.addEventListener('click', () => {
+                document.querySelectorAll('.inventory-slot').forEach(s => s.classList.remove('active'));
+                slot.classList.add('active');
+                gameState.currentBlock = slot.dataset.block;
+            });
+        });
+
+        // ゲームパッド関連
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log('Gamepad connected:', e.gamepad);
+            console.log('Gamepad details:', {
+                id: e.gamepad.id,
+                buttons: e.gamepad.buttons.length,
+                axes: e.gamepad.axes.length
+            });
+            gameState.gamepad = e.gamepad;
+            const statusEl = document.getElementById('gamepad-status');
+            const nameEl = document.getElementById('gamepad-name');
+            nameEl.textContent = e.gamepad.id;
+            statusEl.classList.add('connected');
+
+            // スタート画面のヒントを表示
+            const hint = document.getElementById('gamepad-start-hint');
+            if (hint) hint.style.display = 'block';
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log('Gamepad disconnected');
+            gameState.gamepad = null;
+            document.getElementById('gamepad-status').classList.remove('connected');
+
+            // ヒントを非表示
+            const hint = document.getElementById('gamepad-start-hint');
+            if (hint) hint.style.display = 'none';
+        });
+
+        // ゲームパッド入力処理
+        function updateGamepad() {
+            const gamepads = navigator.getGamepads();
+            if (!gamepads) return null;
+
+            for (const gp of gamepads) {
+                if (gp && gp.connected) {
+                    return gp;
+                }
+            }
+            return null;
+        }
+
+        function selectInventorySlot(index) {
+            const slots = document.querySelectorAll('.inventory-slot');
+            if (index >= 0 && index < slots.length) {
+                slots.forEach(s => s.classList.remove('active'));
+                slots[index].classList.add('active');
+                gameState.currentBlock = slots[index].dataset.block;
+            }
+        }
+
+        function getActiveSlotIndex() {
+            const slots = document.querySelectorAll('.inventory-slot');
+            return Array.from(slots).findIndex(s => s.classList.contains('active'));
+        }
+
+        function isButtonPressed(gp, buttonIndex) {
+            if (!gp || !gp.buttons[buttonIndex]) return false;
+            return gp.buttons[buttonIndex].pressed;
+        }
+
+        function isButtonJustPressed(gp, buttonIndex) {
+            const current = isButtonPressed(gp, buttonIndex);
+            const prev = gameState.gamepadPrevButtons[buttonIndex] || false;
+            gameState.gamepadPrevButtons[buttonIndex] = current;
+            const justPressed = current && !prev;
+
+            // デバッグ: ボタンが押されたらログ出力
+            if (justPressed) {
+                console.log(`Button ${buttonIndex} pressed`);
+            }
+
+            return justPressed;
+        }
+
+        // ゲーム開始
+        window.startGame = function() {
+            document.getElementById('instructions').style.display = 'none';
+            controls.lock();
+        };
+
+        controls.addEventListener('lock', () => {
+            document.getElementById('instructions').style.display = 'none';
+        });
+
+        controls.addEventListener('unlock', () => {
+            document.getElementById('instructions').style.display = 'block';
+        });
+
+        // ゲームパッドでゲーム開始
+        function checkGamepadStart() {
+            const instructions = document.getElementById('instructions');
+            if (instructions.style.display !== 'none') {
+                const gp = updateGamepad();
+
+                // デバッグ: 状態をログ出力
+                if (gp) {
+                    // すべてのボタンの状態をチェック
+                    const pressedButtons = [];
+                    for (let i = 0; i < gp.buttons.length; i++) {
+                        if (gp.buttons[i].pressed) {
+                            pressedButtons.push(i);
+                        }
+                    }
+
+                    if (pressedButtons.length > 0) {
+                        console.log('Buttons currently pressed:', pressedButtons);
+                    }
+
+                    // Aボタン（ボタン0）が押されたか直接チェック
+                    if (gp.buttons[0] && gp.buttons[0].pressed) {
+                        console.log('A button (0) is pressed! Starting game...');
+                        startGame();
+                    }
+                }
+            }
+        }
+
+        // 物理演算とゲームループ
+        const clock = new THREE.Clock();
+        let prevTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+
+            // メニュー画面でもゲームパッドでスタート可能に
+            checkGamepadStart();
+
+            if (controls.isLocked) {
+                // ゲームパッド更新
+                const gp = updateGamepad();
+
+                // 重力（歩行モードのみ）
+                if (!gameState.flyMode) {
+                    gameState.velocity.y -= 30 * delta;
+                } else {
+                    // 飛行モードでは重力なし
+                    gameState.velocity.y = 0;
+                }
+
+                // 移動
+                const moveSpeed = gameState.flyMode ? 15 : 10;
+                const direction = new THREE.Vector3();
+
+                // キーボード入力
+                if (keys['KeyW']) direction.z -= 1;
+                if (keys['KeyS']) direction.z += 1;
+                if (keys['KeyA']) direction.x -= 1;
+                if (keys['KeyD']) direction.x += 1;
+
+                // ゲームパッド 左スティック入力（デッドゾーン処理）
+                if (gp) {
+                    const deadzone = 0.15;
+                    const leftX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
+                    const leftY = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+
+                    direction.x += leftX;
+                    direction.z += leftY;
+                }
+
+                direction.normalize();
+
+                const forward = new THREE.Vector3();
+                camera.getWorldDirection(forward);
+                if (!gameState.flyMode) {
+                    forward.y = 0; // 歩行モードは水平移動のみ
+                }
+                forward.normalize();
+
+                const right = new THREE.Vector3();
+                right.crossVectors(forward, camera.up).normalize();
+
+                const moveVector = new THREE.Vector3();
+                moveVector.addScaledVector(forward, -direction.z * moveSpeed * delta);
+                moveVector.addScaledVector(right, direction.x * moveSpeed * delta);
+
+                // 飛行モードでの上昇・下降
+                if (gameState.flyMode) {
+                    const flySpeed = 10;
+                    // Space: 上昇 / Shift: 下降
+                    if (keys['Space'] || (gp && isButtonPressed(gp, 0))) { // Aボタン
+                        moveVector.y += flySpeed * delta;
+                    }
+                    if (keys['ShiftLeft'] || keys['ShiftRight'] || (gp && isButtonPressed(gp, 6))) { // ZLボタン
+                        moveVector.y -= flySpeed * delta;
+                    }
+                } else {
+                    // 歩行モードでのジャンプ
+                    const jumpPressed = keys['Space'] || (gp && isButtonPressed(gp, 0));
+                    if (jumpPressed && gameState.canJump) {
+                        gameState.velocity.y = 10;
+                        gameState.canJump = false;
+                    }
+                }
+
+                // ゲームパッド右スティック（カメラ操作）
+                if (gp) {
+                    const deadzone = 0.15;
+                    const sensitivity = 2.5;
+                    const rightX = Math.abs(gp.axes[2]) > deadzone ? gp.axes[2] : 0;
+                    const rightY = Math.abs(gp.axes[3]) > deadzone ? gp.axes[3] : 0;
+
+                    if (rightX !== 0 || rightY !== 0) {
+                        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+                        euler.setFromQuaternion(camera.quaternion);
+                        euler.y -= rightX * sensitivity * delta;
+                        euler.x -= rightY * sensitivity * delta;
+                        euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+                        camera.quaternion.setFromEuler(euler);
+                    }
+
+                    // ゲームパッドボタン処理
+                    // Bボタン（破壊/攻撃）
+                    if (isButtonJustPressed(gp, 1)) {
+                        const targetMob = getTargetMob();
+                        if (targetMob) {
+                            // モブを攻撃
+                            targetMob.takeDamage(5);
+                            console.log(`Hit ${targetMob.type}! HP: ${targetMob.health}/${targetMob.maxHealth}`);
+                            // 振動フィードバック
+                            if (gp.vibrationActuator) {
+                                gp.vibrationActuator.playEffect('dual-rumble', {
+                                    startDelay: 0,
+                                    duration: 150,
+                                    weakMagnitude: 0.5,
+                                    strongMagnitude: 0.7
+                                });
+                            }
+                        } else {
+                            // ブロック破壊
+                            const target = getTargetBlock();
+                            if (target) {
+                                const pos = target.object.position;
+                                removeBlock(pos.x, pos.y, pos.z);
+                                // 振動フィードバック
+                                if (gp.vibrationActuator) {
+                                    gp.vibrationActuator.playEffect('dual-rumble', {
+                                        startDelay: 0,
+                                        duration: 100,
+                                        weakMagnitude: 0.3,
+                                        strongMagnitude: 0.5
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    // Xボタン（配置）
+                    if (isButtonJustPressed(gp, 2)) {
+                        const target = getTargetBlock();
+                        if (target) {
+                            const normal = target.face.normal;
+                            const pos = target.object.position.clone().add(normal);
+
+                            // プレイヤーの中心部分と重ならないか確認
+                            const playerPos = camera.position;
+                            const dx = Math.abs(pos.x - playerPos.x);
+                            const dy = pos.y - playerPos.y;
+                            const dz = Math.abs(pos.z - playerPos.z);
+                            const tooClose = dx < 0.5 && dz < 0.5 && dy > -1.5 && dy < 0.5;
+
+                            if (!tooClose) {
+                                addBlock(pos.x, pos.y, pos.z, gameState.currentBlock);
+                                // 振動フィードバック
+                                if (gp.vibrationActuator) {
+                                    gp.vibrationActuator.playEffect('dual-rumble', {
+                                        startDelay: 0,
+                                        duration: 80,
+                                        weakMagnitude: 0.2,
+                                        strongMagnitude: 0.3
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    // 十字キー / L・Rボタン（ブロック選択）
+                    const currentSlot = getActiveSlotIndex();
+                    const slots = document.querySelectorAll('.inventory-slot');
+
+                    // 左 or Lボタン
+                    if (isButtonJustPressed(gp, 12) || isButtonJustPressed(gp, 4)) {
+                        const newSlot = currentSlot > 0 ? currentSlot - 1 : slots.length - 1;
+                        selectInventorySlot(newSlot);
+                    }
+
+                    // 右 or Rボタン
+                    if (isButtonJustPressed(gp, 13) || isButtonJustPressed(gp, 5)) {
+                        const newSlot = currentSlot < slots.length - 1 ? currentSlot + 1 : 0;
+                        selectInventorySlot(newSlot);
+                    }
+
+                    // 上
+                    if (isButtonJustPressed(gp, 14)) {
+                        selectInventorySlot(Math.max(0, currentSlot - 1));
+                    }
+
+                    // 下
+                    if (isButtonJustPressed(gp, 15)) {
+                        selectInventorySlot(Math.min(slots.length - 1, currentSlot + 1));
+                    }
+
+                    // Yボタン（飛行モード切替）
+                    if (isButtonJustPressed(gp, 3)) {
+                        gameState.flyMode = !gameState.flyMode;
+                        const modeIndicator = document.getElementById('mode-indicator');
+                        if (gameState.flyMode) {
+                            modeIndicator.textContent = '✈️ 飛行モード';
+                            modeIndicator.style.color = '#4CAF50';
+                        } else {
+                            modeIndicator.textContent = '🚶 歩行モード';
+                            modeIndicator.style.color = '#FFA500';
+                        }
+                        console.log('飛行モード:', gameState.flyMode);
+                    }
+
+                    // +ボタン（メニュー表示）
+                    if (isButtonJustPressed(gp, 9)) {
+                        controls.unlock();
+                    }
+                }
+
+                // 位置更新
+                if (gameState.flyMode) {
+                    // 飛行モード：衝突判定なしで自由移動
+                    camera.position.add(moveVector);
+                } else {
+                    // 歩行モード：衝突判定付き移動
+                    const newPos = camera.position.clone();
+                    newPos.x += moveVector.x;
+                    if (!checkCollision(newPos)) {
+                        camera.position.x = newPos.x;
+                    }
+
+                    newPos.set(camera.position.x, camera.position.y, camera.position.z);
+                    newPos.z += moveVector.z;
+                    if (!checkCollision(newPos)) {
+                        camera.position.z = newPos.z;
+                    }
+
+                    newPos.set(camera.position.x, camera.position.y, camera.position.z);
+                    newPos.y += gameState.velocity.y * delta;
+                    if (!checkCollision(newPos)) {
+                        camera.position.y = newPos.y;
+                    } else {
+                        if (gameState.velocity.y < 0) {
+                            gameState.canJump = true;
+                        }
+                        gameState.velocity.y = 0;
+                    }
+                }
+
+                // モブ更新
+                for (const mob of gameState.mobs) {
+                    mob.update(delta);
+                }
+
+                        // UI更新
+                const pos = camera.position;
+                let posText = `${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)}`;
+
+                // ゲームパッドデバッグ情報
+                if (gp) {
+                    const axes = gp.axes.map(a => a.toFixed(2)).join(', ');
+                    const buttons = gp.buttons.map((b, i) => b.pressed ? i : '').filter(x => x !== '').join(',');
+                    posText += ` | GP: axes[${axes}] btns[${buttons}]`;
+                }
+
+                document.getElementById('position').textContent = posText;
+            }
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+
+        // リサイズ対応
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 初期化
+        generateWorld();
+        animate();
+    </script>
+</body>
+</html>
