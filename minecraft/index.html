@@ -227,10 +227,10 @@
         // シーン設定
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 0, 200);
+        scene.fog = new THREE.Fog(0x87CEEB, 0, 400); // フォグ距離を拡大
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 20, 0);
+        camera.position.set(-30, 30, -30); // 村の近くからスタート
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -243,13 +243,13 @@
         scene.add(ambientLight);
 
         const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
-        sunLight.position.set(50, 100, 50);
+        sunLight.position.set(100, 150, 100);
         sunLight.castShadow = true;
-        sunLight.shadow.camera.left = -100;
-        sunLight.shadow.camera.right = 100;
-        sunLight.shadow.camera.top = 100;
-        sunLight.shadow.camera.bottom = -100;
-        sunLight.shadow.camera.far = 200;
+        sunLight.shadow.camera.left = -200;
+        sunLight.shadow.camera.right = 200;
+        sunLight.shadow.camera.top = 200;
+        sunLight.shadow.camera.bottom = -200;
+        sunLight.shadow.camera.far = 400;
         sunLight.shadow.mapSize.width = 2048;
         sunLight.shadow.mapSize.height = 2048;
         scene.add(sunLight);
@@ -324,9 +324,130 @@
             }
         }
 
+        // 村生成
+        function generateVillage(centerX, centerZ) {
+            const groundY = getHeight(centerX, centerZ);
+
+            console.log(`Generating village at (${centerX}, ${centerZ})`);
+
+            // 井戸（中心）
+            function buildWell(x, z) {
+                const y = groundY;
+                // 井戸の枠（石）
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dz = -1; dz <= 1; dz++) {
+                        if (Math.abs(dx) === 1 || Math.abs(dz) === 1) {
+                            addBlock(x + dx, y + 1, z + dz, 'stone');
+                            addBlock(x + dx, y + 2, z + dz, 'stone');
+                        }
+                    }
+                }
+                // 中央の水
+                addBlock(x, y + 1, z, 'water');
+            }
+
+            // 家を建てる
+            function buildHouse(x, z, direction) {
+                const y = groundY;
+                const width = 5;
+                const depth = 5;
+                const height = 4;
+
+                // 床
+                for (let dx = 0; dx < width; dx++) {
+                    for (let dz = 0; dz < depth; dz++) {
+                        addBlock(x + dx, y, z + dz, 'wood');
+                    }
+                }
+
+                // 壁
+                for (let h = 1; h <= height; h++) {
+                    for (let dx = 0; dx < width; dx++) {
+                        for (let dz = 0; dz < depth; dz++) {
+                            const isWall = dx === 0 || dx === width - 1 || dz === 0 || dz === depth - 1;
+                            const isDoor = (h <= 2 && dx === 2 && dz === 0); // ドア
+                            const isWindow = (h === 2 && ((dx === 1 || dx === 3) && dz === depth - 1)); // 窓
+
+                            if (isWall && !isDoor) {
+                                if (isWindow) {
+                                    addBlock(x + dx, y + h, z + dz, 'glass');
+                                } else {
+                                    addBlock(x + dx, y + h, z + dz, 'wood');
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 屋根（三角屋根風）
+                for (let layer = 0; layer < 2; layer++) {
+                    for (let dx = layer; dx < width - layer; dx++) {
+                        for (let dz = layer; dz < depth - layer; dz++) {
+                            addBlock(x + dx, y + height + layer + 1, z + dz, 'wood');
+                        }
+                    }
+                }
+            }
+
+            // 畑を作る
+            function buildFarm(x, z) {
+                const y = groundY;
+                for (let dx = 0; dx < 6; dx++) {
+                    for (let dz = 0; dz < 6; dz++) {
+                        addBlock(x + dx, y, z + dz, 'dirt');
+                        // 作物（草ブロックで代用）
+                        if ((dx + dz) % 2 === 0 && dx > 0 && dz > 0) {
+                            addBlock(x + dx, y + 1, z + dz, 'leaves');
+                        }
+                    }
+                }
+            }
+
+            // 道を作る
+            function buildRoad(x1, z1, x2, z2) {
+                const y = groundY;
+                const steps = Math.max(Math.abs(x2 - x1), Math.abs(z2 - z1));
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const x = Math.floor(x1 + (x2 - x1) * t);
+                    const z = Math.floor(z1 + (z2 - z1) * t);
+                    addBlock(x, y, z, 'stone');
+                    addBlock(x + 1, y, z, 'stone');
+                    addBlock(x, y, z + 1, 'stone');
+                }
+            }
+
+            // 井戸を中心に配置
+            buildWell(centerX, centerZ);
+
+            // 家を周りに配置
+            const housePositions = [
+                { x: centerX - 12, z: centerZ - 12 },
+                { x: centerX + 8, z: centerZ - 12 },
+                { x: centerX - 12, z: centerZ + 8 },
+                { x: centerX + 8, z: centerZ + 8 }
+            ];
+
+            housePositions.forEach(pos => {
+                buildHouse(pos.x, pos.z, 0);
+                buildRoad(centerX, centerZ, pos.x + 2, pos.z + 2);
+            });
+
+            // 畑を配置
+            buildFarm(centerX - 8, centerZ - 8);
+            buildFarm(centerX + 4, centerZ + 4);
+
+            // 村人をスポーン
+            for (let i = 0; i < 3; i++) {
+                const x = centerX + (Math.random() - 0.5) * 15;
+                const z = centerZ + (Math.random() - 0.5) * 15;
+                spawnMob('cow', x, z); // 村人の代わりに牛を配置（後で村人モブを追加可能）
+            }
+        }
+
         // ワールド生成
         function generateWorld() {
-            const size = 30;
+            const size = 60; // マップサイズを2倍に拡大
             for (let x = -size; x < size; x++) {
                 for (let z = -size; z < size; z++) {
                     const height = getHeight(x, z);
@@ -362,54 +483,61 @@
                 }
             }
 
-            // モブスポーン
+            // モブスポーン（マップ拡大に伴い数を増やす）
             console.log('Spawning mobs...');
 
-            // 友好的モブをスポーン（各10体）
-            for (let i = 0; i < 10; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            // 友好的モブをスポーン
+            for (let i = 0; i < 20; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('cow', x, z);
             }
 
-            for (let i = 0; i < 8; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            for (let i = 0; i < 15; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('pig', x, z);
             }
 
-            for (let i = 0; i < 8; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            for (let i = 0; i < 15; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('sheep', x, z);
             }
 
-            for (let i = 0; i < 6; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            for (let i = 0; i < 10; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('chicken', x, z);
             }
 
-            // 敵対的モブをスポーン（各5体）
-            for (let i = 0; i < 5; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            // 敵対的モブをスポーン
+            for (let i = 0; i < 10; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('zombie', x, z);
             }
 
-            for (let i = 0; i < 4; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            for (let i = 0; i < 8; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('skeleton', x, z);
             }
 
-            for (let i = 0; i < 3; i++) {
-                const x = (Math.random() - 0.5) * 50;
-                const z = (Math.random() - 0.5) * 50;
+            for (let i = 0; i < 6; i++) {
+                const x = (Math.random() - 0.5) * 100;
+                const z = (Math.random() - 0.5) * 100;
                 spawnMob('creeper', x, z);
             }
 
             console.log(`Spawned ${gameState.mobs.length} mobs`);
+
+            // 村を生成（3つ）
+            console.log('Generating villages...');
+            generateVillage(-40, -40);
+            generateVillage(40, 40);
+            generateVillage(-40, 40);
+            console.log('Villages generated!');
         }
 
         // モブシステム
