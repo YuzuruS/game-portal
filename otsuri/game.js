@@ -1,0 +1,425 @@
+(() => {
+  'use strict';
+
+  // ---------- Level config ----------
+  const LEVELS = [
+    { coins: [10, 50, 100], priceMin: 10, priceMax: 200, priceStep: 10, unlimited: true, questionsPerLevel: 5 },
+    { coins: [1, 5, 10, 50, 100], priceMin: 10, priceMax: 200, priceStep: 1, unlimited: true, questionsPerLevel: 5 },
+    { coins: [1, 5, 10, 50, 100, 500], priceMin: 100, priceMax: 500, priceStep: 1, unlimited: true, questionsPerLevel: 5 },
+    {
+      coins: [1, 5, 10, 50, 100, 500], priceMin: 100, priceMax: 500, priceStep: 1, unlimited: false,
+      handRange: { 1: [2, 4], 5: [1, 3], 10: [2, 4], 50: [1, 3], 100: [2, 4], 500: [1, 3] },
+      questionsPerLevel: 5,
+    },
+  ];
+
+  const PRODUCTS = [
+    { emoji: '🍎', name: 'りんご' }, { emoji: '🍌', name: 'バナナ' }, { emoji: '🍙', name: 'おにぎり' },
+    { emoji: '🍭', name: 'あめ' }, { emoji: '🧃', name: 'ジュース' }, { emoji: '📓', name: 'ノート' },
+    { emoji: '✏️', name: 'えんぴつ' }, { emoji: '🧽', name: 'けしゴム' }, { emoji: '🍞', name: 'パン' },
+    { emoji: '🍰', name: 'ケーキ' }, { emoji: '🎈', name: 'ふうせん' }, { emoji: '🧸', name: 'ぬいぐるみ' },
+    { emoji: '⚽', name: 'ボール' }, { emoji: '🍦', name: 'アイス' }, { emoji: '🍫', name: 'チョコ' },
+  ];
+
+  // ---------- Money helpers ----------
+  function greedyCoinCount(amount) {
+    const denoms = [500, 100, 50, 10, 5, 1];
+    let rem = amount, count = 0;
+    for (const d of denoms) {
+      const n = Math.floor(rem / d);
+      count += n;
+      rem -= n * d;
+    }
+    return count;
+  }
+
+  function canPay(target, hand) {
+    let reachable = new Set([0]);
+    const entries = Object.entries(hand).map(([k, v]) => [Number(k), v]).sort((a, b) => b[0] - a[0]);
+    for (const [coin, count] of entries) {
+      if (count <= 0) continue;
+      const maxK = count === Infinity ? Math.floor(target / coin) : count;
+      const next = new Set(reachable);
+      for (const amt of reachable) {
+        for (let k = 1; k <= maxK; k++) {
+          const na = amt + k * coin;
+          if (na > target) break;
+          next.add(na);
+        }
+      }
+      reachable = next;
+    }
+    return reachable.has(target);
+  }
+
+  function minChangeCoins(price, hand, unlimited) {
+    if (unlimited) return 0;
+    const maxCoin = Math.max(...Object.keys(hand).map(Number));
+    let best = Infinity;
+    for (let T = price; T <= price + maxCoin; T++) {
+      if (canPay(T, hand)) {
+        const cc = greedyCoinCount(T - price);
+        if (cc < best) best = cc;
+        if (best === 0) break;
+      }
+    }
+    return best === Infinity ? 0 : best;
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  // ---------- State ----------
+  const state = {
+    level: 1,
+    questionIndex: 0,
+    score: 0,
+    combo: 0,
+    perfectCount: 0,
+    price: 0,
+    product: PRODUCTS[0],
+    originalHand: {},
+    hand: {},
+    selected: [],
+  };
+  let pendingRetry = false;
+
+  // ---------- DOM refs ----------
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    levelValue: $('levelValue'),
+    questionValue: $('questionValue'),
+    scoreValue: $('scoreValue'),
+    comboValue: $('comboValue'),
+    comboItem: $('comboItem'),
+    gameMascot: $('gameMascot'),
+    productEmoji: $('productEmoji'),
+    productName: $('productName'),
+    priceValue: $('priceValue'),
+    totalValue: $('totalValue'),
+    selectedCoins: $('selectedCoins'),
+    coinTray: $('coinTray'),
+    payBtn: $('payBtn'),
+    clearBtn: $('clearBtn'),
+    feedbackOverlay: $('feedbackOverlay'),
+    feedbackFace: $('feedbackFace'),
+    feedbackText: $('feedbackText'),
+    feedbackSub: $('feedbackSub'),
+    nextBtn: $('nextBtn'),
+    confettiLayer: $('confettiLayer'),
+    startBtn: $('startBtn'),
+    restartBtn: $('restartBtn'),
+    nextLevelBtn: $('nextLevelBtn'),
+    clearedLevel: $('clearedLevel'),
+    clearScore: $('clearScore'),
+    clearStars: $('clearStars'),
+    finalScore: $('finalScore'),
+  };
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+    $(id).classList.add('active');
+  }
+
+  // ---------- Question generation ----------
+  function randPriceForLevel(level) {
+    if (level.priceStep > 1) {
+      const steps = Math.floor((level.priceMax - level.priceMin) / level.priceStep);
+      return level.priceMin + randInt(0, steps) * level.priceStep;
+    }
+    return randInt(level.priceMin, level.priceMax);
+  }
+
+  function generateQuestion() {
+    const level = LEVELS[state.level - 1];
+    state.price = randPriceForLevel(level);
+    state.product = PRODUCTS[randInt(0, PRODUCTS.length - 1)];
+
+    const hand = {};
+    level.coins.forEach((v) => {
+      if (level.unlimited) {
+        hand[v] = Infinity;
+      } else {
+        const [lo, hi] = level.handRange[v];
+        hand[v] = randInt(lo, hi);
+      }
+    });
+    state.originalHand = { ...hand };
+    state.hand = { ...hand };
+    state.selected = [];
+  }
+
+  function renderQuestion() {
+    const level = LEVELS[state.level - 1];
+    els.productEmoji.textContent = state.product.emoji;
+    els.productName.textContent = state.product.name;
+    els.priceValue.textContent = state.price;
+    els.levelValue.textContent = state.level;
+    els.questionValue.textContent = `${state.questionIndex + 1}/${level.questionsPerLevel}`;
+    els.gameMascot.classList.remove('mood-happy', 'mood-good', 'mood-close', 'mood-sad');
+    updateHud();
+    renderCoinTray();
+    renderSelectedCoins();
+  }
+
+  // ---------- Coin UI ----------
+  function renderCoinTray() {
+    const level = LEVELS[state.level - 1];
+    els.coinTray.innerHTML = '';
+    level.coins.forEach((value) => {
+      const btn = document.createElement('button');
+      btn.className = `coin-btn coin-${value}`;
+      btn.type = 'button';
+
+      if (value === 5 || value === 50) {
+        const hole = document.createElement('span');
+        hole.className = 'coin-hole';
+        btn.appendChild(hole);
+      }
+      const label = document.createElement('span');
+      label.className = 'coin-value';
+      label.textContent = value;
+      btn.appendChild(label);
+
+      const remaining = state.hand[value];
+      if (remaining !== Infinity) {
+        const badge = document.createElement('span');
+        badge.className = 'coin-count-badge';
+        badge.textContent = `×${remaining}`;
+        btn.appendChild(badge);
+        if (remaining <= 0) btn.disabled = true;
+      }
+      btn.addEventListener('click', () => onCoinTap(value));
+      els.coinTray.appendChild(btn);
+    });
+  }
+
+  function renderSelectedCoins() {
+    els.selectedCoins.innerHTML = '';
+    state.selected.forEach((value, idx) => {
+      const chip = document.createElement('div');
+      chip.className = `coin-chip coin-${value}`;
+      chip.textContent = value;
+      chip.addEventListener('click', () => onChipTap(idx));
+      els.selectedCoins.appendChild(chip);
+    });
+    const total = state.selected.reduce((a, b) => a + b, 0);
+    els.totalValue.textContent = total;
+    els.payBtn.disabled = total <= 0;
+  }
+
+  function onCoinTap(value) {
+    const level = LEVELS[state.level - 1];
+    if (!level.unlimited) {
+      if (state.hand[value] <= 0) return;
+      state.hand[value] -= 1;
+    }
+    state.selected.push(value);
+    renderCoinTray();
+    renderSelectedCoins();
+  }
+
+  function onChipTap(idx) {
+    const level = LEVELS[state.level - 1];
+    const value = state.selected[idx];
+    state.selected.splice(idx, 1);
+    if (!level.unlimited) state.hand[value] += 1;
+    renderCoinTray();
+    renderSelectedCoins();
+  }
+
+  function resetSelection() {
+    state.selected = [];
+    state.hand = { ...state.originalHand };
+    renderCoinTray();
+    renderSelectedCoins();
+  }
+
+  // ---------- Evaluation ----------
+  function evaluateAnswer() {
+    const level = LEVELS[state.level - 1];
+    const total = state.selected.reduce((a, b) => a + b, 0);
+    if (total < state.price) {
+      return { status: 'insufficient', short: state.price - total };
+    }
+    const change = total - state.price;
+    const changeCoins = greedyCoinCount(change);
+    if (changeCoins === 0) return { status: 'perfect', change, changeCoins };
+    const minCoins = minChangeCoins(state.price, state.originalHand, level.unlimited);
+    if (changeCoins === minCoins) return { status: 'good', change, changeCoins, minCoins };
+    return { status: 'close', change, changeCoins, minCoins };
+  }
+
+  function updateHud() {
+    els.scoreValue.textContent = state.score;
+    els.comboValue.textContent = state.combo;
+  }
+
+  function bumpCombo() {
+    els.comboItem.classList.remove('combo-active');
+    void els.comboItem.offsetWidth;
+    els.comboItem.classList.add('combo-active');
+  }
+
+  function launchConfetti(count = 28) {
+    const colors = ['#ff6fa5', '#ffd166', '#4dd0e1', '#6fcf7f', '#b18cf5'];
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = `${Math.random() * 100}vw`;
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      const duration = 1 + Math.random() * 1.2;
+      piece.style.animationDuration = `${duration}s`;
+      piece.style.animationDelay = `${Math.random() * 0.3}s`;
+      els.confettiLayer.appendChild(piece);
+      setTimeout(() => piece.remove(), (duration + 0.4) * 1000);
+    }
+  }
+
+  function flyCoins() {
+    const scoreRect = els.scoreValue.getBoundingClientRect();
+    const panelRect = els.totalValue.getBoundingClientRect();
+    for (let i = 0; i < 3; i++) {
+      const coin = document.createElement('div');
+      coin.className = 'coin-fly';
+      coin.textContent = '🪙';
+      coin.style.left = `${panelRect.left}px`;
+      coin.style.top = `${panelRect.top}px`;
+      coin.style.setProperty('--fly-x', `${scoreRect.left - panelRect.left}px`);
+      coin.style.setProperty('--fly-y', `${scoreRect.top - panelRect.top}px`);
+      coin.style.animationDelay = `${i * 0.08}s`;
+      document.body.appendChild(coin);
+      setTimeout(() => coin.remove(), 900 + i * 80);
+    }
+  }
+
+  // ---------- Feedback ----------
+  function showFeedback(result) {
+    els.gameMascot.classList.remove('mood-happy', 'mood-good', 'mood-close', 'mood-sad');
+
+    if (result.status === 'insufficient') {
+      els.feedbackFace.textContent = '😟';
+      els.feedbackText.textContent = 'たりないよ！';
+      els.feedbackSub.textContent = `あと ${result.short}えん たりません`;
+      els.gameMascot.classList.add('mood-sad');
+      els.nextBtn.textContent = 'もういちど';
+      pendingRetry = true;
+      els.feedbackOverlay.classList.add('show');
+      return;
+    }
+
+    pendingRetry = false;
+    els.nextBtn.textContent = 'つぎへ ▶';
+
+    if (result.status === 'perfect') {
+      els.feedbackFace.textContent = '🤩';
+      els.feedbackText.textContent = 'パーフェクト！';
+      els.feedbackSub.textContent = 'ぴったり はらえたね！';
+      els.gameMascot.classList.add('mood-happy');
+      state.score += 100;
+      state.combo += 1;
+      state.perfectCount += 1;
+      launchConfetti(30);
+      flyCoins();
+      bumpCombo();
+    } else if (result.status === 'good') {
+      els.feedbackFace.textContent = '😊';
+      els.feedbackText.textContent = 'グッド！';
+      els.feedbackSub.textContent = `おつりは ${result.change}えん（${result.changeCoins}まい）だよ`;
+      els.gameMascot.classList.add('mood-good');
+      state.score += 60;
+      state.combo = 0;
+      launchConfetti(14);
+    } else {
+      els.feedbackFace.textContent = '😅';
+      els.feedbackText.textContent = 'おしい、もうすこし！';
+      els.feedbackSub.textContent = `おつりが ${result.changeCoins}まいに なったよ（さいしょうは ${result.minCoins}まい）`;
+      els.gameMascot.classList.add('mood-close');
+      state.score += 30;
+      state.combo = 0;
+    }
+
+    updateHud();
+    els.feedbackOverlay.classList.add('show');
+  }
+
+  function onNextClick() {
+    els.feedbackOverlay.classList.remove('show');
+    if (pendingRetry) {
+      pendingRetry = false;
+      return;
+    }
+    advanceQuestion();
+  }
+
+  function advanceQuestion() {
+    const level = LEVELS[state.level - 1];
+    state.questionIndex += 1;
+    if (state.questionIndex >= level.questionsPerLevel) {
+      showLevelClear();
+    } else {
+      generateQuestion();
+      renderQuestion();
+    }
+  }
+
+  function showLevelClear() {
+    const stars = state.perfectCount >= 5 ? 3 : state.perfectCount >= 3 ? 2 : 1;
+    els.clearedLevel.textContent = state.level;
+    els.clearScore.textContent = state.score;
+    const starEls = els.clearStars.querySelectorAll('.star');
+    starEls.forEach((el, i) => {
+      el.classList.remove('earned');
+      void el.offsetWidth;
+      if (i < stars) el.classList.add('earned');
+    });
+
+    if (state.level >= LEVELS.length) {
+      els.finalScore.textContent = state.score;
+      showScreen('screen-finalclear');
+    } else {
+      showScreen('screen-levelclear');
+    }
+  }
+
+  function resetGameState() {
+    state.level = 1;
+    state.questionIndex = 0;
+    state.score = 0;
+    state.combo = 0;
+    state.perfectCount = 0;
+    generateQuestion();
+  }
+
+  // ---------- Events ----------
+  els.startBtn.addEventListener('click', () => {
+    resetGameState();
+    renderQuestion();
+    showScreen('screen-game');
+  });
+
+  els.restartBtn.addEventListener('click', () => {
+    resetGameState();
+    renderQuestion();
+    showScreen('screen-game');
+  });
+
+  els.nextLevelBtn.addEventListener('click', () => {
+    state.level += 1;
+    state.questionIndex = 0;
+    state.perfectCount = 0;
+    generateQuestion();
+    renderQuestion();
+    showScreen('screen-game');
+  });
+
+  els.payBtn.addEventListener('click', () => {
+    const result = evaluateAnswer();
+    showFeedback(result);
+  });
+
+  els.clearBtn.addEventListener('click', resetSelection);
+  els.nextBtn.addEventListener('click', onNextClick);
+})();
