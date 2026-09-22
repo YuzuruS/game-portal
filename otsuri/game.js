@@ -303,7 +303,7 @@
     level.coins.forEach((value) => {
       if (level.unlimited) {
         const source = makeCoinEl(value, 'coin-btn');
-        source.onclick = () => selectUnlimited(source, value);
+        source.__activate = () => selectUnlimited(source, value);
         els.coinTray.appendChild(source);
       } else {
         const group = document.createElement('span');
@@ -312,7 +312,7 @@
         els.coinTray.appendChild(group);
         for (let i = 0; i < state.originalHand[value]; i++) {
           const el = makeCoinEl(value, 'coin-btn');
-          el.onclick = () => selectLimited(el, value);
+          el.__activate = () => selectLimited(el, value);
           group.appendChild(el);
         }
       }
@@ -341,7 +341,7 @@
     flipCoins(() => {
       el.className = `coin-chip coin-${value}`;
       els.wallet.appendChild(el);
-      el.onclick = () => deselectLimited(el, value);
+      el.__activate = () => deselectLimited(el, value);
     }, el);
     gsap.delayedCall(0.6, () => { el.dataset.flying = '0'; });
     updateTotals();
@@ -353,7 +353,7 @@
     flipCoins(() => {
       el.className = `coin-btn coin-${value}`;
       els.coinTray.querySelector(`.coin-group[data-denom="${value}"]`).appendChild(el);
-      el.onclick = () => selectLimited(el, value);
+      el.__activate = () => selectLimited(el, value);
     }, el);
     gsap.delayedCall(0.6, () => { el.dataset.flying = '0'; });
     updateTotals();
@@ -366,7 +366,7 @@
     const siblings = REDUCE ? null : Flip.getState([...els.wallet.children]);
 
     const chip = makeCoinEl(value, 'coin-chip');
-    chip.onclick = () => deselectUnlimited(chip, sourceEl, value);
+    chip.__activate = () => deselectUnlimited(chip, sourceEl, value);
     els.wallet.appendChild(chip);
 
     if (siblings) Flip.from(siblings, { duration: 0.4, ease: 'power3.out' });
@@ -587,17 +587,18 @@
     state.busy = true;
     els.payBtn.disabled = true;
 
-    if (result.status === 'insufficient') {
-      shake(els.totalDisplay, 12);
+    try {
+      if (result.status === 'insufficient') {
+        shake(els.totalDisplay, 12);
+        showFeedback(result);
+        return;
+      }
+      await payCoinsToShop();
+      updateTotals(false);
       showFeedback(result);
+    } finally {
       state.busy = false;
-      return;
     }
-
-    await payCoinsToShop();
-    updateTotals(false);
-    showFeedback(result);
-    state.busy = false;
   }
 
   function onNextClick() {
@@ -725,16 +726,50 @@
   els.payBtn.addEventListener('click', submitPayment);
   els.nextBtn.addEventListener('click', onNextClick);
 
+  // --- コインのタップ処理 ---
+  // clickイベントだけに頼ると、スマホでスクロール判定に吸われたときに
+  // 押した見た目だけ出て反応しないことがあるため、pointerup で確定させる。
+  let pressedCoin = null;
+  let pressPoint = null;
+
+  const coinFrom = (target) => (target && target.closest ? target.closest('.coin-btn, .coin-chip') : null);
   // 押し込み感は内側のSVGに適用する（外側はFlipが位置を動かすため）
+  const pressCoin = (el) => {
+    if (el && !REDUCE) gsap.to(el.querySelector('svg'), { scale: 0.85, duration: 0.09, ease: 'power2.out' });
+  };
+  const releaseCoin = (el) => {
+    if (el && !REDUCE) gsap.to(el.querySelector('svg'), { scale: 1, duration: 0.22, ease: 'back.out(3)' });
+  };
+  const activateCoin = (el) => {
+    if (el && typeof el.__activate === 'function') el.__activate();
+  };
+
   document.addEventListener('pointerdown', (e) => {
-    const coin = e.target.closest('.coin-btn, .coin-chip');
-    if (coin && !REDUCE) gsap.to(coin.querySelector('svg'), { scale: 0.85, duration: 0.09, ease: 'power2.out' });
+    const coin = coinFrom(e.target);
+    if (!coin) return;
+    pressedCoin = coin;
+    pressPoint = { x: e.clientX, y: e.clientY };
+    pressCoin(coin);
   });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => {
-    document.addEventListener(ev, (e) => {
-      const coin = e.target.closest && e.target.closest('.coin-btn, .coin-chip');
-      if (coin && !REDUCE) gsap.to(coin.querySelector('svg'), { scale: 1, duration: 0.22, ease: 'back.out(3)' });
-    });
+
+  document.addEventListener('pointerup', (e) => {
+    const coin = pressedCoin;
+    pressedCoin = null;
+    releaseCoin(coin);
+    if (!coin) return;
+    const moved = Math.hypot(e.clientX - pressPoint.x, e.clientY - pressPoint.y);
+    if (moved < 20 && coinFrom(e.target) === coin) activateCoin(coin);
+  });
+
+  document.addEventListener('pointercancel', () => {
+    releaseCoin(pressedCoin);
+    pressedCoin = null;
+  });
+
+  // キーボード操作（Enter/Space）はclickだけが飛んでくるので拾う
+  document.addEventListener('click', (e) => {
+    if (e.detail !== 0) return;
+    activateCoin(coinFrom(e.target));
   });
 
   buildSky();

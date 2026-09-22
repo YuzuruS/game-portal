@@ -178,8 +178,8 @@ body {
 .wallet {
   position: relative;
   min-height: 62px;
-  display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
-  padding: 8px 10px; margin-bottom: 10px;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  padding: 10px 12px; margin-bottom: 10px;
   border: 3px dashed #ffd9c2; border-radius: var(--r-md);
   background: linear-gradient(180deg, #fffaf2, #fff4e6);
 }
@@ -191,8 +191,8 @@ body {
 
 /* コイントレイ */
 .coin-tray {
-  display: flex; flex-wrap: wrap; gap: 9px; justify-content: center;
-  padding: 12px 8px 6px; border-radius: var(--r-md);
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+  padding: 14px 10px 10px; border-radius: var(--r-md);
   background: linear-gradient(180deg, #fbf3e6, #f6e9d6);
   box-shadow: inset 0 3px 8px rgba(160, 120, 80, .18);
   min-height: 78px;
@@ -200,14 +200,21 @@ body {
 .coin-group { display: contents; }
 
 .coin-btn, .coin-chip {
+  position: relative;
   border: none; background: none; padding: 0; cursor: pointer;
-  display: block; line-height: 0; touch-action: manipulation;
+  display: block; line-height: 0;
+  /* タップがスクロール判定に吸われて反応しなくなるのを防ぐ */
+  touch-action: none;
   will-change: transform;
 }
-.coin-btn { width: 60px; height: 60px; }
-.coin-btn.coin-500 { width: 66px; height: 66px; }
-.coin-chip { width: 42px; height: 42px; }
-.coin-chip.coin-500 { width: 46px; height: 46px; }
+/* 見た目は変えずにタップできる範囲だけ広げる */
+.coin-btn::after, .coin-chip::after {
+  content: ''; position: absolute; inset: -6px; border-radius: 50%;
+}
+.coin-btn { width: 62px; height: 62px; }
+.coin-btn.coin-500 { width: 68px; height: 68px; }
+.coin-chip { width: 46px; height: 46px; }
+.coin-chip.coin-500 { width: 50px; height: 50px; }
 .coin-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 4px rgba(120, 85, 50, .3)); }
 .coin-chip .coin-svg { filter: drop-shadow(0 2px 3px rgba(120, 85, 50, .28)); }
 
@@ -256,8 +263,8 @@ body {
 .fx-item svg { display: block; }
 
 @media (max-width: 380px) {
-  .coin-btn { width: 53px; height: 53px; }
-  .coin-btn.coin-500 { width: 58px; height: 58px; }
+  .coin-btn { width: 54px; height: 54px; }
+  .coin-btn.coin-500 { width: 60px; height: 60px; }
   .game-title { font-size: 2.1rem; }
   .mascot { width: 92px; }
 }
