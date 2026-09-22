@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#fff6e9">
 <title>おつりチャレンジ！おみせやさん</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,15 +12,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="sky" aria-hidden="true"><div class="sky-layer" id="skyLayer"></div></div>
+
 <div id="app">
 
   <!-- タイトル画面 -->
   <section id="screen-title" class="screen active">
     <div class="title-card">
-      <div class="mascot mascot-title" id="titleMascot">🐱</div>
-      <h1 class="game-title">おつり<br>チャレンジ！</h1>
+      <div class="title-mascot" id="titleMascot"></div>
+      <h1 class="game-title">
+        <span class="title-line title-line--1">おつり</span>
+        <span class="title-line title-line--2">チャレンジ！</span>
+      </h1>
       <p class="game-subtitle">おみせやさんで じょうずに おかいもの しよう</p>
-      <button class="btn btn-primary btn-big" id="startBtn">はじめる ▶</button>
+      <button class="btn btn-primary btn-big" id="startBtn">はじめる</button>
       <a href="../" class="btn-link">← ゲームポータルへ もどる</a>
     </div>
   </section>
@@ -27,41 +33,38 @@
   <!-- ゲーム画面 -->
   <section id="screen-game" class="screen">
     <header class="game-header">
-      <div class="hud-item">
-        <span class="hud-label">レベル</span>
-        <span class="hud-value" id="levelValue">1</span>
+      <div class="hud-item" id="hudLevel">
+        <span class="hud-label">レベル</span><span class="hud-value" id="levelValue">1</span>
       </div>
-      <div class="hud-item">
-        <span class="hud-label">もんだい</span>
-        <span class="hud-value" id="questionValue">1/5</span>
+      <div class="hud-item" id="hudQuestion">
+        <span class="hud-label">もんだい</span><span class="hud-value" id="questionValue">1/5</span>
       </div>
-      <div class="hud-item">
-        <span class="hud-label">スコア</span>
-        <span class="hud-value" id="scoreValue">0</span>
+      <div class="hud-item" id="hudScore">
+        <span class="hud-label">スコア</span><span class="hud-value" id="scoreValue">0</span>
       </div>
       <div class="hud-item combo-item" id="comboItem">
-        <span class="hud-label">コンボ</span>
-        <span class="hud-value" id="comboValue">0</span>
+        <span class="hud-label">コンボ</span><span class="hud-value" id="comboValue">0</span>
       </div>
     </header>
 
     <div class="shop-scene">
-      <div class="mascot mascot-game" id="gameMascot">🐱</div>
+      <div class="mascot" id="gameMascot"></div>
       <div class="speech-bubble" id="speechBubble">
         <div class="product">
-          <span class="product-emoji" id="productEmoji">🍎</span>
+          <span class="product-art" id="productArt"></span>
           <span class="product-name" id="productName">りんご</span>
         </div>
-        <div class="product-price"><span id="priceValue">80</span>えん</div>
+        <div class="product-price"><span id="priceValue">0</span><em>えん</em></div>
       </div>
     </div>
 
     <div class="payment-panel">
-      <div class="total-display">
+      <div class="total-display" id="totalDisplay">
         <span class="total-label">だした きんがく</span>
-        <span class="total-value"><span id="totalValue">0</span>えん</span>
+        <span class="total-value"><span id="totalValue">0</span><em>えん</em></span>
       </div>
-      <div class="selected-coins" id="selectedCoins"></div>
+
+      <div class="wallet" id="selectedCoins"></div>
 
       <div class="coin-tray" id="coinTray"></div>
 
@@ -72,32 +75,29 @@
 
     <div class="feedback-overlay" id="feedbackOverlay">
       <div class="feedback-card" id="feedbackCard">
-        <div class="feedback-face" id="feedbackFace">🎉</div>
+        <div class="feedback-face" id="feedbackFace"></div>
         <div class="feedback-text" id="feedbackText">パーフェクト！</div>
         <div class="feedback-sub" id="feedbackSub"></div>
-        <button class="btn btn-primary" id="nextBtn">つぎへ ▶</button>
+        <button class="btn btn-primary" id="nextBtn">つぎへ</button>
       </div>
     </div>
-
-    <div class="confetti-layer" id="confettiLayer"></div>
   </section>
 
   <!-- レベルクリア画面 -->
   <section id="screen-levelclear" class="screen">
     <div class="clear-card">
+      <div class="clear-mascot" id="clearMascot"></div>
       <div class="clear-title">レベル <span id="clearedLevel">1</span> クリア！</div>
-      <div class="stars" id="clearStars">
-        <span class="star">⭐</span><span class="star">⭐</span><span class="star">⭐</span>
-      </div>
+      <div class="stars" id="clearStars"></div>
       <div class="clear-score">スコア：<span id="clearScore">0</span></div>
-      <button class="btn btn-primary btn-big" id="nextLevelBtn">つぎの レベルへ ▶</button>
+      <button class="btn btn-primary btn-big" id="nextLevelBtn">つぎの レベルへ</button>
     </div>
   </section>
 
   <!-- 全クリア画面 -->
   <section id="screen-finalclear" class="screen">
     <div class="clear-card">
-      <div class="mascot mascot-final" id="finalMascot">🎉</div>
+      <div class="final-trophy" id="finalTrophy"></div>
       <div class="clear-title">ぜんぶ クリア！<br>おめでとう！</div>
       <div class="clear-score">さいしゅうスコア：<span id="finalScore">0</span></div>
       <button class="btn btn-primary btn-big" id="restartBtn">もういちど あそぶ</button>
@@ -106,6 +106,15 @@
   </section>
 
 </div>
+
+<canvas class="confetti-canvas" id="confettiCanvas" aria-hidden="true"></canvas>
+<div class="fx-layer" id="fxLayer" aria-hidden="true"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Flip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="assets.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
