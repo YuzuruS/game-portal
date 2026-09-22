@@ -1,36 +1,32 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg-1: #fff6e9;
-  --bg-2: #ffe3ef;
+  --bg-1: #fff7ea;
+  --bg-2: #ffe6f0;
+  --bg-3: #e8f5ff;
   --pink: #ff6fa5;
-  --pink-dark: #e8558f;
+  --pink-dark: #e04d87;
+  --pink-deep: #b93a6c;
   --yellow: #ffd166;
-  --yellow-dark: #f2a90f;
-  --blue: #4dd0e1;
-  --green: #6fcf7f;
+  --yellow-dark: #f0a91f;
+  --blue: #5ec8e0;
+  --green: #6fcf8a;
   --purple: #b18cf5;
-  --text: #4a3b3b;
+  --ink: #5b4636;
+  --ink-soft: #977a68;
   --white: #fffdf8;
-  --shadow: 0 8px 20px rgba(140, 90, 60, 0.18);
-  --radius-lg: 28px;
-  --radius-md: 18px;
-  --radius-sm: 12px;
+  --card-shadow: 0 10px 26px rgba(150, 100, 70, .16);
+  --r-lg: 30px;
+  --r-md: 20px;
+  --r-sm: 14px;
 }
 
-html, body {
-  height: 100%;
-  overscroll-behavior: none;
-}
+html, body { height: 100%; overscroll-behavior: none; }
 
 body {
   font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
-  background: linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
-  color: var(--text);
+  background: linear-gradient(170deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%);
+  color: var(--ink);
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
@@ -38,500 +34,230 @@ body {
   touch-action: manipulation;
 }
 
+/* ---------- 背景の浮遊デコレーション ---------- */
+.sky { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+.sky-dot { position: absolute; opacity: .5; }
+.sky-dot svg { display: block; }
+
 #app {
+  position: relative;
+  z-index: 1;
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  position: relative;
-  padding: 16px;
+  padding: 14px 16px 24px;
   display: flex;
   flex-direction: column;
 }
 
-.screen {
-  display: none;
-  flex: 1;
-  flex-direction: column;
-}
-.screen.active {
-  display: flex;
-  animation: screen-in 0.35s ease;
-}
+.screen { display: none; flex: 1; flex-direction: column; }
+.screen.active { display: flex; }
 
-@keyframes screen-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ---------- Buttons ---------- */
+/* ---------- ボタン ---------- */
 .btn {
-  font-family: inherit;
-  font-weight: 800;
+  position: relative;
+  font-family: 'Mochiy Pop One', 'M PLUS Rounded 1c', sans-serif;
   border: none;
   border-radius: 999px;
-  padding: 14px 28px;
+  padding: 15px 30px;
   font-size: 1.05rem;
+  color: var(--white);
   cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.2s;
+  letter-spacing: .04em;
+  background: linear-gradient(180deg, #ff87b4, var(--pink));
+  box-shadow: 0 6px 0 var(--pink-deep), 0 12px 20px rgba(185, 58, 108, .28);
+  transition: transform .08s ease, box-shadow .08s ease;
   touch-action: manipulation;
 }
-.btn:active {
-  transform: scale(0.94);
-  box-shadow: 0 4px 10px rgba(140, 90, 60, 0.18);
-}
-.btn-primary {
-  background: linear-gradient(135deg, var(--pink), var(--pink-dark));
-  color: var(--white);
-}
-.btn-big {
-  font-size: 1.3rem;
-  padding: 18px 36px;
-  width: 100%;
-  max-width: 320px;
-}
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-}
-.btn-link {
-  display: inline-block;
-  margin-top: 18px;
-  color: #a98a7a;
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-
-/* ---------- Title screen ---------- */
-#screen-title {
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 20px;
-}
-.title-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-}
-.mascot-title {
-  font-size: 5.5rem;
-  animation: float-bounce 2.4s ease-in-out infinite;
-  filter: drop-shadow(0 10px 14px rgba(140, 90, 60, 0.25));
-}
-@keyframes float-bounce {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-16px) rotate(4deg); }
-}
-.game-title {
-  font-family: 'Mochiy Pop One', sans-serif;
-  font-size: 2.4rem;
-  line-height: 1.3;
-  background: linear-gradient(90deg, var(--pink), var(--purple), var(--blue));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.game-subtitle {
-  color: #8a6f63;
-  font-size: 0.95rem;
-}
-
-/* ---------- HUD ---------- */
-.game-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.hud-item {
-  background: var(--white);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  text-align: center;
-  box-shadow: var(--shadow);
-  flex: 1;
-  transition: transform 0.2s;
-}
-.hud-label {
-  display: block;
-  font-size: 0.62rem;
-  color: #a98a7a;
-}
-.hud-value {
-  display: block;
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: var(--pink-dark);
-}
-.combo-item.combo-active {
-  animation: combo-pulse 0.5s ease;
-  background: linear-gradient(135deg, #fff2c2, var(--yellow));
-}
-@keyframes combo-pulse {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.18); }
-  100% { transform: scale(1); }
-}
-
-/* ---------- Shop scene ---------- */
-.shop-scene {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 18px;
-  box-shadow: var(--shadow);
-  margin-bottom: 14px;
-  position: relative;
-  overflow: visible;
-}
-.mascot-game {
-  font-size: 4.2rem;
-  flex-shrink: 0;
-  transition: transform 0.25s ease;
-  filter: drop-shadow(0 8px 10px rgba(140, 90, 60, 0.2));
-}
-.mascot-game.mood-happy { animation: mood-happy 0.6s ease; }
-.mascot-game.mood-good { animation: mood-good 0.6s ease; }
-.mascot-game.mood-close { animation: mood-close 0.6s ease; }
-.mascot-game.mood-sad { animation: mood-sad 0.5s ease; }
-@keyframes mood-happy {
-  0% { transform: scale(1) rotate(0); }
-  30% { transform: scale(1.3) rotate(-10deg); }
-  60% { transform: scale(1.1) rotate(10deg); }
-  100% { transform: scale(1) rotate(0); }
-}
-@keyframes mood-good {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-14px); }
-}
-@keyframes mood-close {
-  0%, 100% { transform: rotate(0); }
-  25% { transform: rotate(-8deg); }
-  75% { transform: rotate(8deg); }
-}
-@keyframes mood-sad {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-6px); }
-  75% { transform: translateX(6px); }
-}
-
-.speech-bubble {
-  background: #fff8ef;
-  border: 2px solid #ffe4c2;
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  flex: 1;
-  position: relative;
-}
-.speech-bubble::before {
+.btn::after {
   content: '';
   position: absolute;
-  left: -9px;
-  top: 22px;
-  width: 0; height: 0;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-  border-right: 10px solid #ffe4c2;
+  left: 14%; right: 14%; top: 6px; height: 34%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0));
+  pointer-events: none;
 }
-.product {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.btn:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--pink-deep), 0 4px 10px rgba(185, 58, 108, .25);
 }
-.product-emoji {
-  font-size: 2.1rem;
-}
-.product-name {
-  font-weight: 800;
-  font-size: 1.05rem;
-}
-.product-price {
-  margin-top: 4px;
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--pink-dark);
-  font-family: 'Mochiy Pop One', sans-serif;
+.btn:disabled { filter: saturate(.35) brightness(1.06); opacity: .75; cursor: not-allowed; }
+.btn-big { font-size: 1.25rem; padding: 18px 38px; width: 100%; max-width: 320px; }
+.btn-link {
+  display: inline-block; margin-top: 16px; color: var(--ink-soft);
+  font-size: .85rem; text-decoration: none; font-weight: 700;
 }
 
-/* ---------- Payment panel ---------- */
-.payment-panel {
+/* ---------- タイトル画面 ---------- */
+#screen-title { align-items: center; justify-content: center; text-align: center; }
+.title-card { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.title-mascot { width: 190px; filter: drop-shadow(0 14px 16px rgba(150, 100, 70, .24)); }
+.title-mascot svg { width: 100%; height: auto; display: block; }
+
+.game-title {
+  font-family: 'Mochiy Pop One', sans-serif;
+  font-size: 2.5rem; line-height: 1.18; margin: 4px 0 2px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.title-line { display: block; }
+.title-line--1 { color: #ff9f4a; -webkit-text-stroke: 7px #fff; paint-order: stroke fill; filter: drop-shadow(0 4px 0 #e9822b); }
+.title-line--2 { color: var(--pink); -webkit-text-stroke: 7px #fff; paint-order: stroke fill; filter: drop-shadow(0 4px 0 var(--pink-deep)); }
+.game-subtitle { color: var(--ink-soft); font-size: .95rem; font-weight: 700; margin-bottom: 8px; }
+
+/* ---------- HUD ---------- */
+.game-header { display: flex; gap: 7px; margin-bottom: 12px; }
+.hud-item {
+  flex: 1; background: var(--white); border-radius: var(--r-sm);
+  padding: 7px 4px 8px; text-align: center;
+  box-shadow: 0 4px 0 rgba(213, 180, 150, .45), 0 8px 16px rgba(150, 100, 70, .12);
+}
+.hud-label { display: block; font-size: .6rem; color: var(--ink-soft); font-weight: 700; letter-spacing: .08em; }
+.hud-value { display: block; font-family: 'Mochiy Pop One', sans-serif; font-size: 1.16rem; color: var(--pink-dark); }
+.combo-item { background: linear-gradient(180deg, #fff6d6, #ffe8a6); }
+.combo-item .hud-value { color: var(--yellow-dark); }
+
+/* ---------- お店のシーン ---------- */
+.shop-scene {
+  position: relative;
+  display: flex; align-items: flex-end; gap: 8px;
   background: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  box-shadow: var(--shadow);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  border-radius: var(--r-lg);
+  padding: 14px 16px 14px 10px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.shop-scene::before {
+  content: ''; position: absolute; inset: auto 0 0 0; height: 26px;
+  background: repeating-linear-gradient(90deg, #ffd9e5 0 16px, #fff1f5 16px 32px);
+  opacity: .8;
+}
+.mascot { position: relative; width: 112px; flex-shrink: 0; margin-bottom: -4px; }
+.wallet, .coin-tray { perspective: 700px; }
+.mascot svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 8px 8px rgba(150, 100, 70, .2)); }
+
+.speech-bubble {
+  position: relative; flex: 1; align-self: center;
+  background: linear-gradient(180deg, #fffdf6, #fff6e6);
+  border: 3px solid #ffe0b8;
+  border-radius: var(--r-md);
+  padding: 10px 14px 12px;
+}
+.speech-bubble::before {
+  content: ''; position: absolute; left: -13px; top: 30px;
+  border-top: 9px solid transparent; border-bottom: 9px solid transparent;
+  border-right: 13px solid #ffe0b8;
+}
+.product { display: flex; align-items: center; gap: 9px; }
+.product-art { width: 52px; height: 52px; flex-shrink: 0; }
+.product-art svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 4px rgba(150, 100, 70, .18)); }
+.product-name { font-weight: 800; font-size: 1.05rem; }
+.product-price {
+  margin-top: 3px; font-family: 'Mochiy Pop One', sans-serif;
+  font-size: 1.85rem; color: var(--pink-dark); line-height: 1.1;
+}
+.product-price em { font-style: normal; font-size: .95rem; margin-left: 2px; }
+
+/* ---------- 支払いパネル ---------- */
+.payment-panel {
+  background: var(--white); border-radius: var(--r-lg);
+  padding: 14px; box-shadow: var(--card-shadow);
+  display: flex; flex-direction: column;
 }
 .total-display {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  background: linear-gradient(135deg, #fff2c2, #ffe3ef);
-  border-radius: var(--radius-md);
-  padding: 10px 16px;
-  margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(135deg, #fff3cd, #ffe1ec);
+  border-radius: var(--r-md); padding: 9px 16px; margin-bottom: 8px;
+  box-shadow: inset 0 -3px 0 rgba(224, 77, 135, .12);
 }
-.total-label {
-  font-size: 0.8rem;
-  color: #8a6f63;
-}
-.total-value {
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: var(--pink-dark);
-  font-family: 'Mochiy Pop One', sans-serif;
-}
+.total-label { font-size: .78rem; color: var(--ink-soft); font-weight: 800; }
+.total-value { font-family: 'Mochiy Pop One', sans-serif; font-size: 1.6rem; color: var(--pink-dark); }
+.total-value em { font-style: normal; font-size: .9rem; margin-left: 2px; }
 
-.selected-coins {
-  min-height: 46px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 4px 2px;
-  margin-bottom: 10px;
-  border-bottom: 2px dashed #f4dfce;
+/* さいふ（選んだコイン置き場） */
+.wallet {
+  position: relative;
+  min-height: 62px;
+  display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+  padding: 8px 10px; margin-bottom: 10px;
+  border: 3px dashed #ffd9c2; border-radius: var(--r-md);
+  background: linear-gradient(180deg, #fffaf2, #fff4e6);
 }
-.selected-coins:empty::before {
+.wallet:empty::before {
   content: 'コインを タップして えらぼう';
-  color: #c2ab9e;
-  font-size: 0.82rem;
+  color: #c9b3a2; font-size: .82rem; font-weight: 700;
+  position: absolute; left: 0; right: 0; text-align: center;
 }
 
-.coin-chip {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 0.72rem;
-  font-family: inherit;
-  cursor: pointer;
-  box-shadow: 0 3px 6px rgba(140, 90, 60, 0.25);
-  touch-action: manipulation;
-}
-.coin-chip .coin-hole {
-  display: none;
-}
-
-.coin-group {
-  display: contents;
-}
-
+/* コイントレイ */
 .coin-tray {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-  padding: 10px 0 4px;
+  display: flex; flex-wrap: wrap; gap: 9px; justify-content: center;
+  padding: 12px 8px 6px; border-radius: var(--r-md);
+  background: linear-gradient(180deg, #fbf3e6, #f6e9d6);
+  box-shadow: inset 0 3px 8px rgba(160, 120, 80, .18);
+  min-height: 78px;
 }
+.coin-group { display: contents; }
 
-.coin-btn {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 0.85rem;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(140, 90, 60, 0.28);
-  transition: transform 0.12s ease;
-  touch-action: manipulation;
+.coin-btn, .coin-chip {
+  border: none; background: none; padding: 0; cursor: pointer;
+  display: block; line-height: 0; touch-action: manipulation;
+  will-change: transform;
 }
-.coin-btn:active:not(:disabled) {
-  transform: scale(0.88);
-}
-.coin-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-.coin-btn .coin-hole {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(255, 253, 248, 0.9);
-  box-shadow: inset 0 2px 3px rgba(140, 90, 60, 0.25);
-  z-index: 0;
-}
-.coin-btn .coin-value {
-  position: relative;
-  z-index: 1;
-}
-/* JPY coin colors */
-.coin-1 { background: radial-gradient(circle at 35% 30%, #ffffff, #dfe6ea); color: #6b7680; }
-.coin-5 { background: radial-gradient(circle at 35% 30%, #f4e08a, #d1a83a); color: #6b4d10; }
-.coin-10 { background: radial-gradient(circle at 35% 30%, #e0a56d, #b06a34); color: #4a2c10; }
-.coin-50 { background: radial-gradient(circle at 35% 30%, #eef2f5, #c7d0d8); color: #55606a; }
-.coin-100 { background: radial-gradient(circle at 35% 30%, #f4f7f9, #cdd6de); color: #4c565f; }
-.coin-500 {
-  width: 66px; height: 66px;
-  background: radial-gradient(circle at 35% 30%, #f8e28b, #cd9d2e);
-  color: #5c4009;
-}
-.coin-chip.coin-500 { width: 44px; height: 44px; }
+.coin-btn { width: 60px; height: 60px; }
+.coin-btn.coin-500 { width: 66px; height: 66px; }
+.coin-chip { width: 42px; height: 42px; }
+.coin-chip.coin-500 { width: 46px; height: 46px; }
+.coin-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 4px rgba(120, 85, 50, .3)); }
+.coin-chip .coin-svg { filter: drop-shadow(0 2px 3px rgba(120, 85, 50, .28)); }
 
-.panel-buttons {
-  display: flex;
-  margin-top: 10px;
-}
+.panel-buttons { display: flex; padding-top: 12px; }
 .panel-buttons .btn-pay { flex: 1; }
 
-/* ---------- Feedback overlay ---------- */
+/* ---------- 判定オーバーレイ ---------- */
 .feedback-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(74, 59, 59, 0.45);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
-  padding: 20px;
+  position: fixed; inset: 0; background: rgba(91, 70, 54, .42);
+  display: none; align-items: center; justify-content: center; z-index: 40; padding: 20px;
+  backdrop-filter: blur(2px);
 }
-.feedback-overlay.show {
-  display: flex;
-  animation: overlay-in 0.2s ease;
-}
-@keyframes overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+.feedback-overlay.show { display: flex; }
 .feedback-card {
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 28px 24px;
-  text-align: center;
-  max-width: 320px;
-  width: 100%;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-  animation: card-pop 0.35s cubic-bezier(.34,1.56,.64,1);
+  background: var(--white); border-radius: var(--r-lg);
+  padding: 22px 24px 26px; text-align: center; max-width: 330px; width: 100%;
+  box-shadow: 0 22px 44px rgba(60, 40, 30, .34);
 }
-@keyframes card-pop {
-  from { transform: scale(0.5); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-.feedback-face {
-  font-size: 4rem;
-  margin-bottom: 6px;
-}
-.feedback-text {
-  font-family: 'Mochiy Pop One', sans-serif;
-  font-size: 1.5rem;
-  color: var(--pink-dark);
-  margin-bottom: 6px;
-}
-.feedback-sub {
-  font-size: 0.95rem;
-  color: #8a6f63;
-  margin-bottom: 18px;
-  min-height: 1.2em;
-}
+.feedback-face { width: 140px; margin: 0 auto 6px; }
+.feedback-face svg { width: 100%; height: auto; display: block; }
+.feedback-text { font-family: 'Mochiy Pop One', sans-serif; font-size: 1.55rem; color: var(--pink-dark); margin-bottom: 6px; }
+.feedback-sub { font-size: .92rem; color: var(--ink-soft); font-weight: 700; margin-bottom: 16px; min-height: 1.2em; line-height: 1.5; }
 
-/* ---------- Confetti ---------- */
-.confetti-layer {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 30;
-}
-.confetti-piece {
-  position: absolute;
-  top: -20px;
-  width: 10px;
-  height: 10px;
-  opacity: 0.95;
-  animation-name: confetti-fall;
-  animation-timing-function: ease-in;
-  animation-fill-mode: forwards;
-}
-@keyframes confetti-fall {
-  to {
-    transform: translateY(110vh) rotate(600deg);
-    opacity: 0.2;
-  }
-}
-.coin-fly {
-  position: fixed;
-  font-size: 1.6rem;
-  z-index: 25;
-  pointer-events: none;
-  animation: coin-fly-anim 0.7s ease-in forwards;
-}
-@keyframes coin-fly-anim {
-  0% { transform: translate(0,0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--fly-x), var(--fly-y)) scale(0.3); opacity: 0; }
-}
-
-/* ---------- Clear screens ---------- */
-#screen-levelclear, #screen-finalclear {
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
+/* ---------- クリア画面 ---------- */
+#screen-levelclear, #screen-finalclear { align-items: center; justify-content: center; text-align: center; }
 .clear-card {
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 32px 24px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
+  background: var(--white); border-radius: var(--r-lg);
+  padding: 26px 22px 30px; box-shadow: var(--card-shadow);
+  display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;
 }
-.clear-title {
-  font-family: 'Mochiy Pop One', sans-serif;
-  font-size: 1.6rem;
-  color: var(--pink-dark);
-  line-height: 1.4;
-}
-.stars {
-  font-size: 2.6rem;
-  display: flex;
-  gap: 6px;
-}
-.stars .star {
-  opacity: 0.25;
-  transform: scale(0.5);
-  transition: none;
-}
-.stars .star.earned {
-  opacity: 1;
-  animation: star-pop 0.5s cubic-bezier(.34,1.56,.64,1) forwards;
-}
-.stars .star:nth-child(1).earned { animation-delay: 0.05s; }
-.stars .star:nth-child(2).earned { animation-delay: 0.25s; }
-.stars .star:nth-child(3).earned { animation-delay: 0.45s; }
-@keyframes star-pop {
-  from { transform: scale(0.5) rotate(-20deg); opacity: 0.25; }
-  60% { transform: scale(1.3) rotate(10deg); opacity: 1; }
-  to { transform: scale(1) rotate(0); opacity: 1; }
-}
-.clear-score {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: #8a6f63;
-}
-.mascot-final {
-  font-size: 4.5rem;
-  animation: float-bounce 1.8s ease-in-out infinite;
-}
+.clear-mascot { width: 150px; }
+.clear-mascot svg { width: 100%; height: auto; display: block; }
+.final-trophy { width: 140px; }
+.final-trophy svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 10px 12px rgba(200, 150, 30, .3)); }
+.clear-title { font-family: 'Mochiy Pop One', sans-serif; font-size: 1.55rem; color: var(--pink-dark); line-height: 1.45; }
+.stars { display: flex; gap: 10px; }
+.stars .star { width: 56px; }
+.stars .star svg { width: 100%; height: auto; display: block; }
+.stars .star--empty { filter: grayscale(1) opacity(.3); }
+.clear-score { font-family: 'Mochiy Pop One', sans-serif; font-size: 1.1rem; color: var(--ink-soft); }
 
-@media (max-width: 360px) {
-  .coin-btn { width: 52px; height: 52px; font-size: 0.75rem; }
-  .game-title { font-size: 2rem; }
+/* ---------- エフェクトレイヤー ---------- */
+.confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+.fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
+.fx-item { position: fixed; top: 0; left: 0; will-change: transform; }
+.fx-item svg { display: block; }
+
+@media (max-width: 380px) {
+  .coin-btn { width: 53px; height: 53px; }
+  .coin-btn.coin-500 { width: 58px; height: 58px; }
+  .game-title { font-size: 2.1rem; }
+  .mascot { width: 92px; }
 }
