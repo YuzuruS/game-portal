@@ -80,8 +80,6 @@
     price: 0,
     product: PRODUCTS[0],
     originalHand: {},
-    hand: {},
-    selected: [],
   };
   let pendingRetry = false;
 
@@ -101,7 +99,6 @@
     selectedCoins: $('selectedCoins'),
     coinTray: $('coinTray'),
     payBtn: $('payBtn'),
-    clearBtn: $('clearBtn'),
     feedbackOverlay: $('feedbackOverlay'),
     feedbackFace: $('feedbackFace'),
     feedbackText: $('feedbackText'),
@@ -145,9 +142,7 @@
         hand[v] = randInt(lo, hi);
       }
     });
-    state.originalHand = { ...hand };
-    state.hand = { ...hand };
-    state.selected = [];
+    state.originalHand = hand;
   }
 
   function renderQuestion() {
@@ -159,87 +154,178 @@
     els.questionValue.textContent = `${state.questionIndex + 1}/${level.questionsPerLevel}`;
     els.gameMascot.classList.remove('mood-happy', 'mood-good', 'mood-close', 'mood-sad');
     updateHud();
-    renderCoinTray();
-    renderSelectedCoins();
+    els.selectedCoins.innerHTML = '';
+    renderCoinTray(level);
+    updateTotals();
+  }
+
+  // ---------- FLIP animation helper ----------
+  // Runs `mutate` (a DOM change, e.g. reparenting + restyling `el`), then
+  // smoothly animates `el` from its pre-mutation position/size to the new one.
+  function flipMove(el, mutate) {
+    const first = el.getBoundingClientRect();
+    mutate();
+    const last = el.getBoundingClientRect();
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    const sx = first.width / last.width;
+    const sy = first.height / last.height;
+    el.style.transition = 'none';
+    el.style.transformOrigin = 'top left';
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform 0.38s cubic-bezier(.34,1.56,.64,1)';
+        el.style.transform = 'none';
+      });
+    });
+    el.addEventListener('transitionend', () => {
+      el.style.transition = '';
+      el.style.transform = '';
+      el.style.transformOrigin = '';
+    }, { once: true });
+  }
+
+  function animateNewChipFrom(chip, startRect) {
+    const endRect = chip.getBoundingClientRect();
+    const dx = startRect.left - endRect.left;
+    const dy = startRect.top - endRect.top;
+    const sx = startRect.width / endRect.width;
+    const sy = startRect.height / endRect.height;
+    chip.style.transition = 'none';
+    chip.style.transformOrigin = 'top left';
+    chip.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chip.style.transition = 'transform 0.38s cubic-bezier(.34,1.56,.64,1)';
+        chip.style.transform = 'none';
+      });
+    });
+  }
+
+  function animateChipToRectThenRemove(chip, targetRect) {
+    chip.style.transition = 'transform 0.3s ease-in';
+    chip.style.transformOrigin = 'top left';
+    const startRect = chip.getBoundingClientRect();
+    const dx = targetRect.left - startRect.left;
+    const dy = targetRect.top - startRect.top;
+    const sx = targetRect.width / startRect.width;
+    const sy = targetRect.height / startRect.height;
+    chip.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    chip.addEventListener('transitionend', () => chip.remove(), { once: true });
   }
 
   // ---------- Coin UI ----------
-  function renderCoinTray() {
-    const level = LEVELS[state.level - 1];
+  function createCoinFace(value, withHole) {
+    const frag = document.createDocumentFragment();
+    if (withHole && (value === 5 || value === 50)) {
+      const hole = document.createElement('span');
+      hole.className = 'coin-hole';
+      frag.appendChild(hole);
+    }
+    const label = document.createElement('span');
+    label.className = 'coin-value';
+    label.textContent = value;
+    frag.appendChild(label);
+    return frag;
+  }
+
+  function renderCoinTray(level) {
     els.coinTray.innerHTML = '';
+
     level.coins.forEach((value) => {
-      const btn = document.createElement('button');
-      btn.className = `coin-btn coin-${value}`;
-      btn.type = 'button';
-
-      if (value === 5 || value === 50) {
-        const hole = document.createElement('span');
-        hole.className = 'coin-hole';
-        btn.appendChild(hole);
+      if (level.unlimited) {
+        const source = document.createElement('button');
+        source.type = 'button';
+        source.className = `coin-btn coin-${value}`;
+        source.appendChild(createCoinFace(value, true));
+        source.addEventListener('click', () => selectUnlimitedCoin(source, value));
+        els.coinTray.appendChild(source);
+      } else {
+        const group = document.createElement('span');
+        group.className = 'coin-group';
+        group.dataset.denom = value;
+        els.coinTray.appendChild(group);
+        const count = state.originalHand[value];
+        for (let i = 0; i < count; i++) {
+          group.appendChild(createLimitedCoin(value));
+        }
       }
-      const label = document.createElement('span');
-      label.className = 'coin-value';
-      label.textContent = value;
-      btn.appendChild(label);
-
-      const remaining = state.hand[value];
-      if (remaining !== Infinity) {
-        const badge = document.createElement('span');
-        badge.className = 'coin-count-badge';
-        badge.textContent = `×${remaining}`;
-        btn.appendChild(badge);
-        if (remaining <= 0) btn.disabled = true;
-      }
-      btn.addEventListener('click', () => onCoinTap(value));
-      els.coinTray.appendChild(btn);
     });
   }
 
-  function renderSelectedCoins() {
-    els.selectedCoins.innerHTML = '';
-    state.selected.forEach((value, idx) => {
-      const chip = document.createElement('div');
-      chip.className = `coin-chip coin-${value}`;
-      chip.textContent = value;
-      chip.addEventListener('click', () => onChipTap(idx));
-      els.selectedCoins.appendChild(chip);
+  function createLimitedCoin(value) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = `coin-btn coin-${value}`;
+    el.appendChild(createCoinFace(value, true));
+    el.dataset.value = value;
+    el.onclick = () => selectLimitedCoin(el, value);
+    return el;
+  }
+
+  function selectLimitedCoin(el, value) {
+    if (el.dataset.flipping === 'true') return;
+    el.dataset.flipping = 'true';
+    flipMove(el, () => {
+      el.className = `coin-chip coin-${value}`;
+      els.selectedCoins.appendChild(el);
+      el.onclick = () => deselectLimitedCoin(el, value);
     });
-    const total = state.selected.reduce((a, b) => a + b, 0);
+    setTimeout(() => { el.dataset.flipping = 'false'; }, 400);
+    updateTotals();
+  }
+
+  function deselectLimitedCoin(el, value) {
+    if (el.dataset.flipping === 'true') return;
+    el.dataset.flipping = 'true';
+    flipMove(el, () => {
+      el.className = `coin-btn coin-${value}`;
+      const group = els.coinTray.querySelector(`.coin-group[data-denom="${value}"]`);
+      group.appendChild(el);
+      el.onclick = () => selectLimitedCoin(el, value);
+    });
+    setTimeout(() => { el.dataset.flipping = 'false'; }, 400);
+    updateTotals();
+  }
+
+  function selectUnlimitedCoin(sourceBtn, value) {
+    const startRect = sourceBtn.getBoundingClientRect();
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `coin-chip coin-${value}`;
+    chip.dataset.value = value;
+    chip.textContent = value;
+    chip.addEventListener('click', () => deselectUnlimitedCoin(chip, sourceBtn));
+    els.selectedCoins.appendChild(chip);
+    animateNewChipFrom(chip, startRect);
+    updateTotals();
+  }
+
+  function deselectUnlimitedCoin(chip, sourceBtn) {
+    if (chip.dataset.removing === 'true') return;
+    chip.dataset.removing = 'true';
+    const targetRect = sourceBtn.getBoundingClientRect();
+    animateChipToRectThenRemove(chip, targetRect);
+    updateTotals();
+  }
+
+  function getSelectedTotal() {
+    return Array.from(els.selectedCoins.children)
+      .filter((el) => el.dataset.removing !== 'true')
+      .reduce((sum, el) => sum + Number(el.dataset.value), 0);
+  }
+
+  function updateTotals() {
+    const total = getSelectedTotal();
     els.totalValue.textContent = total;
     els.payBtn.disabled = total <= 0;
-  }
-
-  function onCoinTap(value) {
-    const level = LEVELS[state.level - 1];
-    if (!level.unlimited) {
-      if (state.hand[value] <= 0) return;
-      state.hand[value] -= 1;
-    }
-    state.selected.push(value);
-    renderCoinTray();
-    renderSelectedCoins();
-  }
-
-  function onChipTap(idx) {
-    const level = LEVELS[state.level - 1];
-    const value = state.selected[idx];
-    state.selected.splice(idx, 1);
-    if (!level.unlimited) state.hand[value] += 1;
-    renderCoinTray();
-    renderSelectedCoins();
-  }
-
-  function resetSelection() {
-    state.selected = [];
-    state.hand = { ...state.originalHand };
-    renderCoinTray();
-    renderSelectedCoins();
   }
 
   // ---------- Evaluation ----------
   function evaluateAnswer() {
     const level = LEVELS[state.level - 1];
-    const total = state.selected.reduce((a, b) => a + b, 0);
+    const total = getSelectedTotal();
     if (total < state.price) {
       return { status: 'insufficient', short: state.price - total };
     }
@@ -420,6 +506,5 @@
     showFeedback(result);
   });
 
-  els.clearBtn.addEventListener('click', resetSelection);
   els.nextBtn.addEventListener('click', onNextClick);
 })();

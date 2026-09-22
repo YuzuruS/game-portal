@@ -84,11 +84,6 @@ body {
   background: linear-gradient(135deg, var(--pink), var(--pink-dark));
   color: var(--white);
 }
-.btn-ghost {
-  background: var(--white);
-  color: var(--pink-dark);
-  border: 2px solid #ffd7e6;
-}
 .btn-big {
   font-size: 1.3rem;
   padding: 18px 36px;
@@ -313,20 +308,23 @@ body {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   font-size: 0.72rem;
+  font-family: inherit;
   cursor: pointer;
-  animation: chip-in 0.25s ease;
   box-shadow: 0 3px 6px rgba(140, 90, 60, 0.25);
-  border: 2px solid rgba(255,255,255,0.7);
   touch-action: manipulation;
 }
-@keyframes chip-in {
-  from { transform: scale(0); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+.coin-chip .coin-hole {
+  display: none;
+}
+
+.coin-group {
+  display: contents;
 }
 
 .coin-tray {
@@ -373,19 +371,6 @@ body {
   position: relative;
   z-index: 1;
 }
-.coin-count-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: var(--pink-dark);
-  color: white;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  padding: 1px 6px;
-  font-weight: 800;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
 /* JPY coin colors */
 .coin-1 { background: radial-gradient(circle at 35% 30%, #ffffff, #dfe6ea); color: #6b7680; }
 .coin-5 { background: radial-gradient(circle at 35% 30%, #f4e08a, #d1a83a); color: #6b4d10; }
@@ -401,11 +386,9 @@ body {
 
 .panel-buttons {
   display: flex;
-  gap: 10px;
   margin-top: 10px;
 }
-.panel-buttons .btn-pay { flex: 2; }
-.panel-buttons .btn-ghost { flex: 1; }
+.panel-buttons .btn-pay { flex: 1; }
 
 /* ---------- Feedback overlay ---------- */
 .feedback-overlay {
