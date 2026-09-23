@@ -358,6 +358,8 @@
     els.gameLevelName.textContent = `${currentMode().name}・レベル${state.levelIndex + 1}`;
     els.questionValue.textContent = `${state.questionIndex + 1}/${QUESTIONS_PER_LEVEL}`;
     els.wallet.innerHTML = '';
+    els.wallet.style.height = '';
+    els.coinTray.style.minHeight = '';
     renderCoinTray(level);
     updateTotals(false);
     updateHud(false);
@@ -390,6 +392,13 @@
     el.dataset.value = value;
     el.innerHTML = ART.coin(value);
     return el;
+  }
+
+  // コインを取り出した跡に置く空きスロット（トレイの並びをずらさないため）
+  function createSlot(value) {
+    const slot = document.createElement('span');
+    slot.className = `coin-slot coin-slot--${value}`;
+    return slot;
   }
 
   function renderCoinTray(level) {
@@ -432,6 +441,9 @@
   function selectLimited(el, value) {
     if (state.busy || el.dataset.flying === '1') return;
     el.dataset.flying = '1';
+    const slot = createSlot(value);
+    el.parentNode.insertBefore(slot, el);
+    el.__slot = slot;
     flipCoins(() => {
       el.className = `coin-chip coin-${value}`;
       els.wallet.appendChild(el);
@@ -444,9 +456,12 @@
   function deselectLimited(el, value) {
     if (state.busy || el.dataset.flying === '1') return;
     el.dataset.flying = '1';
+    const slot = el.__slot;
+    el.__slot = null;
     flipCoins(() => {
       el.className = `coin-btn coin-${value}`;
-      els.coinTray.querySelector(`.coin-group[data-denom="${value}"]`).appendChild(el);
+      if (slot && slot.isConnected) slot.parentNode.replaceChild(el, slot);
+      else els.coinTray.querySelector(`.coin-group[data-denom="${value}"]`).appendChild(el);
       el.__activate = () => selectLimited(el, value);
     }, el);
     gsap.delayedCall(0.6, () => { el.dataset.flying = '0'; });
@@ -562,11 +577,18 @@
   function payCoinsToShop() {
     const chips = [...els.wallet.children];
     if (!chips.length || REDUCE) { chips.forEach((c) => c.remove()); return Promise.resolve(); }
+
+    // 1枚ずつ外すと残りのコインが詰めて動いてしまうので、
+    // 先に全部の位置を測ってから、まとめて切り離す。
+    const rects = chips.map((chip) => rectOf(chip));
+    // 支払い中にさいふが縮んで下のボタンが動かないよう高さを固定する
+    els.wallet.style.height = `${rectOf(els.wallet).height}px`;
     const target = centerOf(rectOf(els.gameMascot));
+    chips.forEach((chip, i) => detach(chip, rects[i]));
+
     return new Promise((resolve) => {
       chips.forEach((chip, i) => {
-        const from = rectOf(chip);
-        detach(chip, from);
+        const from = rects[i];
         const dx = target.x - centerOf(from).x;
         const dy = target.y - centerOf(from).y - 10;
         gsap.to(chip, {
@@ -863,8 +885,8 @@
     clearCatTimelines();
     els.gameMascot.innerHTML = ART.cat('idle');
     animateCat(els.gameMascot);
-    renderQuestion();
     showScreen('screen-game');
+    renderQuestion();
     if (!REDUCE) {
       gsap.fromTo('.game-header .hud-item', { y: -20, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.45, stagger: 0.06, ease: 'back.out(2)' });
