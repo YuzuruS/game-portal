@@ -6,17 +6,76 @@
   const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const D = (s) => (REDUCE ? 0.01 : s); // アニメーション時間（低減設定を尊重）
 
-  // ---------- レベル設定 ----------
-  const LEVELS = [
-    { coins: [10, 50, 100], priceMin: 10, priceMax: 200, priceStep: 10, unlimited: true, questionsPerLevel: 5 },
-    { coins: [1, 5, 10, 50, 100], priceMin: 10, priceMax: 200, priceStep: 1, unlimited: true, questionsPerLevel: 5 },
-    { coins: [1, 5, 10, 50, 100, 500], priceMin: 100, priceMax: 500, priceStep: 1, unlimited: true, questionsPerLevel: 5 },
+  // ---------- モードとレベル ----------
+  const QUESTIONS_PER_LEVEL = 5;
+
+  const MODES = [
     {
-      coins: [1, 5, 10, 50, 100, 500], priceMin: 100, priceMax: 500, priceStep: 1, unlimited: false,
-      handRange: { 1: [2, 4], 5: [1, 3], 10: [2, 4], 50: [1, 3], 100: [2, 4], 500: [1, 3] },
-      questionsPerLevel: 5,
+      key: 'free',
+      name: 'じゆうに はらう',
+      desc: 'コインは つかいほうだい。ぴったりの きんがくを つくろう',
+      note: 'コインは なんまいでも つかえます。ぴったり はらえたら パーフェクト！',
+      levels: [
+        { name: '10・50・100えん', detail: '10〜200えん（10えんずつ）', coins: [10, 50, 100], priceMin: 10, priceMax: 200, priceStep: 10 },
+        { name: '500えんも なかま', detail: '50〜500えん（10えんずつ）', coins: [10, 50, 100, 500], priceMin: 50, priceMax: 500, priceStep: 10 },
+        { name: '5えんも なかま', detail: '50〜500えん（5えんずつ）', coins: [5, 10, 50, 100, 500], priceMin: 50, priceMax: 500, priceStep: 5 },
+        { name: '1えんも なかま', detail: '100〜500えん（1えんずつ）', coins: [1, 5, 10, 50, 100, 500], priceMin: 100, priceMax: 500, priceStep: 1 },
+        { name: 'そうしあげ', detail: '300〜990えん（1えんずつ）', coins: [1, 5, 10, 50, 100, 500], priceMin: 300, priceMax: 990, priceStep: 1 },
+      ],
+    },
+    {
+      key: 'wallet',
+      name: 'おさいふで はらう',
+      desc: 'てもちの コインは かぎられている。おつりが すくなくなるように！',
+      note: 'てもちの コインだけで はらいます。おつりが いちばん すくなくなる だしかたを さがそう',
+      levels: [
+        { name: 'おさいふ ならし', detail: '50〜300えん', coins: [10, 50, 100], priceMin: 50, priceMax: 300, priceStep: 10,
+          hand: { 10: [3, 5], 50: [2, 3], 100: [3, 4] } },
+        { name: '5えんも なかま', detail: '50〜400えん', coins: [5, 10, 50, 100, 500], priceMin: 50, priceMax: 400, priceStep: 5,
+          hand: { 5: [2, 3], 10: [3, 4], 50: [2, 3], 100: [3, 4], 500: [1, 1] } },
+        { name: 'ぜんぶの コイン', detail: '100〜500えん', coins: [1, 5, 10, 50, 100, 500], priceMin: 100, priceMax: 500, priceStep: 1,
+          hand: { 1: [2, 4], 5: [1, 3], 10: [2, 4], 50: [1, 3], 100: [2, 4], 500: [1, 2] } },
+        { name: 'こぜにが たりない！', detail: '200〜800えん', coins: [1, 5, 10, 50, 100, 500], priceMin: 200, priceMax: 800, priceStep: 1,
+          hand: { 1: [1, 2], 5: [1, 1], 10: [1, 2], 50: [1, 2], 100: [2, 4], 500: [1, 2] }, noExact: true },
+        { name: 'そうしあげ', detail: '300〜990えん', coins: [1, 5, 10, 50, 100, 500], priceMin: 300, priceMax: 990, priceStep: 1,
+          hand: { 1: [0, 2], 5: [0, 1], 10: [1, 2], 50: [1, 1], 100: [2, 4], 500: [1, 2] }, noExact: true },
+      ],
     },
   ];
+  MODES.forEach((mode) => mode.levels.forEach((lv, i) => {
+    lv.index = i; lv.modeKey = mode.key; lv.unlimited = !lv.hand;
+  }));
+
+  const getMode = (key) => MODES.find((m) => m.key === key);
+  const currentMode = () => getMode(state.modeKey);
+  const currentLevel = () => currentMode().levels[state.levelIndex];
+
+  // ---------- 進捗（星の数）の保存 ----------
+  const PROGRESS_KEY = 'otsuri-progress-v1';
+
+  function loadProgress() {
+    const fresh = {};
+    MODES.forEach((m) => { fresh[m.key] = m.levels.map(() => 0); });
+    try {
+      const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+      MODES.forEach((m) => {
+        if (!Array.isArray(saved[m.key])) return;
+        m.levels.forEach((_, i) => {
+          const v = Number(saved[m.key][i]);
+          if (Number.isFinite(v) && v >= 0 && v <= 3) fresh[m.key][i] = v;
+        });
+      });
+    } catch (e) { /* 壊れていたら初期値で続行 */ }
+    return fresh;
+  }
+
+  const progress = loadProgress();
+
+  function saveProgress() {
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* 保存できなくても続行 */ }
+  }
+
+  const isUnlocked = (modeKey, idx) => idx === 0 || progress[modeKey][idx - 1] > 0;
 
   const PARTY_COLORS = ['#ff6fa5', '#ffd166', '#5ec8e0', '#6fcf8a', '#b18cf5', '#ffffff'];
 
@@ -28,35 +87,38 @@
     return count;
   }
 
-  function canPay(target, hand) {
+  // 手持ちで作れる支払い額の集合（max円まで）
+  function reachableSums(hand, max) {
     let reachable = new Set([0]);
     const entries = Object.entries(hand).map(([k, v]) => [Number(k), v]).sort((a, b) => b[0] - a[0]);
     for (const [coin, count] of entries) {
       if (count <= 0) continue;
-      const maxK = count === Infinity ? Math.floor(target / coin) : count;
+      const maxK = count === Infinity ? Math.floor(max / coin) : count;
       const next = new Set(reachable);
       for (const amt of reachable) {
         for (let k = 1; k <= maxK; k++) {
           const na = amt + k * coin;
-          if (na > target) break;
+          if (na > max) break;
           next.add(na);
         }
       }
       reachable = next;
     }
-    return reachable.has(target);
+    return reachable;
   }
+
+  const canPay = (target, hand) => reachableSums(hand, target).has(target);
 
   function minChangeCoins(price, hand, unlimited) {
     if (unlimited) return 0;
     const maxCoin = Math.max(...Object.keys(hand).map(Number));
+    const sums = reachableSums(hand, price + maxCoin);
     let best = Infinity;
     for (let T = price; T <= price + maxCoin; T++) {
-      if (canPay(T, hand)) {
-        const cc = greedyCoinCount(T - price);
-        if (cc < best) best = cc;
-        if (best === 0) break;
-      }
+      if (!sums.has(T)) continue;
+      const cc = greedyCoinCount(T - price);
+      if (cc < best) best = cc;
+      if (best === 0) break;
     }
     return best === Infinity ? 0 : best;
   }
@@ -65,21 +127,26 @@
 
   // ---------- 状態 ----------
   const state = {
-    level: 1, questionIndex: 0, score: 0, combo: 0, perfectCount: 0,
+    modeKey: 'free', levelIndex: 0, questionIndex: 0, score: 0, combo: 0, bestCount: 0,
     price: 0, product: ART.ITEM_LIST[0], originalHand: {}, busy: false,
   };
   let pendingRetry = false;
 
   const $ = (id) => document.getElementById(id);
   const els = {
-    levelValue: $('levelValue'), questionValue: $('questionValue'), scoreValue: $('scoreValue'),
+    questionValue: $('questionValue'), scoreValue: $('scoreValue'),
+    modeList: $('modeList'), levelList: $('levelList'), levelsTitle: $('levelsTitle'),
+    levelsNote: $('levelsNote'), gameLevelName: $('gameLevelName'), finalStars: $('finalStars'),
+    finalModeName: $('finalModeName'), modeBackBtn: $('modeBackBtn'), levelsBackBtn: $('levelsBackBtn'),
+    gameBackBtn: $('gameBackBtn'), clearToLevelsBtn: $('clearToLevelsBtn'),
+    finalToLevelsBtn: $('finalToLevelsBtn'), finalToModesBtn: $('finalToModesBtn'),
     comboValue: $('comboValue'), comboItem: $('comboItem'), gameMascot: $('gameMascot'),
     productArt: $('productArt'), productName: $('productName'), priceValue: $('priceValue'),
     totalValue: $('totalValue'), totalDisplay: $('totalDisplay'), wallet: $('selectedCoins'),
     coinTray: $('coinTray'), payBtn: $('payBtn'), feedbackOverlay: $('feedbackOverlay'),
     feedbackCard: $('feedbackCard'), feedbackFace: $('feedbackFace'), feedbackText: $('feedbackText'),
     feedbackSub: $('feedbackSub'), nextBtn: $('nextBtn'), startBtn: $('startBtn'),
-    restartBtn: $('restartBtn'), nextLevelBtn: $('nextLevelBtn'), clearedLevel: $('clearedLevel'),
+    nextLevelBtn: $('nextLevelBtn'), clearedLevel: $('clearedLevel'),
     clearScore: $('clearScore'), clearStars: $('clearStars'), clearMascot: $('clearMascot'),
     finalScore: $('finalScore'), finalTrophy: $('finalTrophy'), titleMascot: $('titleMascot'),
     speechBubble: $('speechBubble'), shopScene: document.querySelector('.shop-scene'),
@@ -236,33 +303,60 @@
   }
 
   // ---------- 出題 ----------
-  function randPriceForLevel(level) {
-    if (level.priceStep > 1) {
-      const steps = Math.floor((level.priceMax - level.priceMin) / level.priceStep);
-      return level.priceMin + randInt(0, steps) * level.priceStep;
+  function randPrice(min, max, step) {
+    if (max < min) return min;
+    if (step > 1) {
+      const lo = Math.ceil(min / step);
+      const hi = Math.floor(max / step);
+      return (hi < lo ? lo : randInt(lo, hi)) * step;
     }
-    return randInt(level.priceMin, level.priceMax);
+    return randInt(min, max);
   }
 
-  function generateQuestion() {
-    const level = LEVELS[state.level - 1];
-    state.price = randPriceForLevel(level);
-    state.product = ART.ITEM_LIST[randInt(0, ART.ITEM_LIST.length - 1)];
+  function buildHand(level) {
     const hand = {};
     level.coins.forEach((v) => {
-      hand[v] = level.unlimited ? Infinity : randInt(level.handRange[v][0], level.handRange[v][1]);
+      hand[v] = level.unlimited ? Infinity : randInt(level.hand[v][0], level.hand[v][1]);
     });
+    return hand;
+  }
+
+  const handTotal = (hand) => Object.entries(hand).reduce((sum, [v, n]) => sum + Number(v) * n, 0);
+
+  function generateQuestion() {
+    const level = currentLevel();
+    state.product = ART.ITEM_LIST[randInt(0, ART.ITEM_LIST.length - 1)];
+
+    if (level.unlimited) {
+      state.originalHand = buildHand(level);
+      state.price = randPrice(level.priceMin, level.priceMax, level.priceStep);
+      return;
+    }
+
+    // 手持ちで必ず払えて、レベルによっては「ぴったり払えない」状況を作る
+    for (let attempt = 0; attempt < 150; attempt++) {
+      const hand = buildHand(level);
+      const maxPrice = Math.min(level.priceMax, handTotal(hand) - 20);
+      if (maxPrice < level.priceMin) continue;
+      const price = randPrice(level.priceMin, maxPrice, level.priceStep);
+      if (level.noExact && canPay(price, hand)) continue;
+      state.originalHand = hand;
+      state.price = price;
+      return;
+    }
+    const hand = buildHand(level);
     state.originalHand = hand;
+    state.price = Math.max(level.priceMin, Math.min(level.priceMax, handTotal(hand) - 50));
   }
 
   function renderQuestion(animate = true) {
-    const level = LEVELS[state.level - 1];
+    const level = currentLevel();
     gsap.killTweensOf(els.productArt);
     gsap.set(els.productArt, { clearProps: 'all' });
     els.productArt.innerHTML = ART.item(state.product.key);
     els.productName.textContent = state.product.name;
-    els.levelValue.textContent = state.level;
-    els.questionValue.textContent = `${state.questionIndex + 1}/${level.questionsPerLevel}`;
+    els.gameLevelName.textContent = `${currentMode().name}・レベル${state.levelIndex + 1}`;
+    els.questionValue.textContent = `${state.questionIndex + 1}/${QUESTIONS_PER_LEVEL}`;
     els.wallet.innerHTML = '';
     renderCoinTray(level);
     updateTotals(false);
@@ -455,7 +549,7 @@
 
   // ---------- 判定 ----------
   function evaluateAnswer(total) {
-    const level = LEVELS[state.level - 1];
+    const level = currentLevel();
     if (total < state.price) return { status: 'insufficient', short: state.price - total };
     const change = total - state.price;
     const changeCoins = greedyCoinCount(change);
@@ -551,10 +645,10 @@
       els.nextBtn.textContent = 'つぎへ';
       if (result.status === 'perfect') {
         els.feedbackSub.textContent = conf.sub;
-        state.score += 100; state.combo += 1; state.perfectCount += 1;
+        state.score += 100; state.combo += 1; state.bestCount += 1;
       } else if (result.status === 'good') {
-        els.feedbackSub.textContent = `おつりは ${result.change}えん（${result.changeCoins}まい）だよ`;
-        state.score += 60; state.combo = 0;
+        els.feedbackSub.textContent = `おつりは ${result.change}えん（${result.changeCoins}まい）\nこれいじょう すくなく できないよ！`;
+        state.score += 80; state.combo += 1; state.bestCount += 1;
       } else {
         els.feedbackSub.textContent = `おつりが ${result.changeCoins}まいに なったよ\nさいしょうは ${result.minCoins}まい！`;
         state.score += 30; state.combo = 0;
@@ -615,10 +709,9 @@
   }
 
   function advanceQuestion() {
-    const level = LEVELS[state.level - 1];
     state.questionIndex += 1;
-    if (state.questionIndex >= level.questionsPerLevel) {
-      showLevelClear();
+    if (state.questionIndex >= QUESTIONS_PER_LEVEL) {
+      finishLevel();
     } else {
       generateQuestion();
       renderQuestion();
@@ -626,60 +719,147 @@
   }
 
   // ---------- クリア画面 ----------
-  function showLevelClear() {
-    const stars = state.perfectCount >= 5 ? 3 : state.perfectCount >= 3 ? 2 : 1;
-
-    if (state.level >= LEVELS.length) {
-      els.finalTrophy.innerHTML = ART.trophy();
-      els.finalScore.textContent = '0';
-      showScreen('screen-finalclear');
-      celebrate('clear');
-      if (!REDUCE) {
-        gsap.fromTo(els.finalTrophy, { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.9, ease: 'elastic.out(1, 0.5)' });
-        gsap.to(els.finalTrophy, { y: -10, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 0.9 });
-      }
-      tickNumber(els.finalScore, state.score, 1.2);
-      return;
-    }
-
-    clearCatTimelines();
-    els.clearMascot.innerHTML = ART.cat('happy');
-    animateCat(els.clearMascot);
-    els.clearedLevel.textContent = state.level;
-    els.clearScore.textContent = '0';
-    els.clearStars.innerHTML = '';
+  function renderStars(container, stars) {
+    container.innerHTML = '';
     for (let i = 0; i < 3; i++) {
       const slot = document.createElement('span');
       slot.className = `star ${i < stars ? '' : 'star--empty'}`;
       slot.innerHTML = ART.star();
-      els.clearStars.appendChild(slot);
+      container.appendChild(slot);
     }
+    if (REDUCE) return;
+    const starEls = [...container.children];
+    starEls.forEach((el, i) => {
+      gsap.fromTo(el, { scale: 0, rotation: -120 }, {
+        scale: 1, rotation: 0, duration: 0.7, ease: 'elastic.out(1, 0.5)', delay: 0.35 + i * 0.22,
+        onStart: () => {
+          if (!el.classList.contains('star--empty')) {
+            const c = centerOf(rectOf(el));
+            gsap.delayedCall(0.12, () => sparkleAt(c.x, c.y, 6));
+          }
+        },
+      });
+    });
+    gsap.to(starEls.filter((el) => !el.classList.contains('star--empty')), {
+      y: -6, duration: 0.9, yoyo: true, repeat: -1, ease: 'sine.inOut', stagger: 0.15, delay: 1.3,
+    });
+  }
+
+  function finishLevel() {
+    const mode = currentMode();
+    const stars = state.bestCount >= 5 ? 3 : state.bestCount >= 3 ? 2 : 1;
+    if (stars > progress[mode.key][state.levelIndex]) {
+      progress[mode.key][state.levelIndex] = stars;
+      saveProgress();
+    }
+    if (state.levelIndex >= mode.levels.length - 1) showModeClear(stars);
+    else showLevelClear(stars);
+  }
+
+  function showLevelClear(stars) {
+    clearCatTimelines();
+    els.clearMascot.innerHTML = ART.cat('happy');
+    animateCat(els.clearMascot);
+    els.clearedLevel.textContent = state.levelIndex + 1;
+    els.clearScore.textContent = '0';
+    renderStars(els.clearStars, stars);
     showScreen('screen-levelclear');
     celebrate('clear');
     tickNumber(els.clearScore, state.score, 1.1);
-
     if (!REDUCE) {
       gsap.fromTo(els.clearMascot, { scale: 0.5, y: 30 }, { scale: 1, y: 0, duration: 0.7, ease: 'back.out(1.8)' });
-      const starEls = [...els.clearStars.children];
-      starEls.forEach((s, i) => {
-        gsap.fromTo(s, { scale: 0, rotation: -120 }, {
-          scale: 1, rotation: 0, duration: 0.7, ease: 'elastic.out(1, 0.5)', delay: 0.35 + i * 0.22,
-          onStart: () => {
-            if (!s.classList.contains('star--empty')) {
-              const c = centerOf(rectOf(s));
-              gsap.delayedCall(0.12, () => sparkleAt(c.x, c.y, 6));
-            }
-          },
-        });
-      });
-      gsap.to(starEls.filter((s) => !s.classList.contains('star--empty')), {
-        y: -6, duration: 0.9, yoyo: true, repeat: -1, ease: 'sine.inOut', stagger: 0.15, delay: 1.3,
-      });
     }
   }
 
-  // ---------- 起動 ----------
-  function startGameScreen() {
+  function showModeClear(stars) {
+    els.finalTrophy.innerHTML = ART.trophy();
+    els.finalModeName.textContent = currentMode().name;
+    els.finalScore.textContent = '0';
+    renderStars(els.finalStars, stars);
+    showScreen('screen-finalclear');
+    celebrate('clear');
+    tickNumber(els.finalScore, state.score, 1.2);
+    if (!REDUCE) {
+      gsap.fromTo(els.finalTrophy, { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.9, ease: 'elastic.out(1, 0.5)' });
+      gsap.to(els.finalTrophy, { y: -10, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 0.9 });
+    }
+  }
+
+  // ---------- モード選択 ----------
+  function openModes() {
+    els.modeList.innerHTML = '';
+    MODES.forEach((mode) => {
+      const earned = progress[mode.key].reduce((a, b) => a + b, 0);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `mode-card mode-card--${mode.key}`;
+      const art = mode.key === 'free'
+        ? `<span class="mini-coin mini-coin--a">${ART.coin(100)}</span>
+           <span class="mini-coin mini-coin--b">${ART.coin(50)}</span>
+           <span class="mini-coin mini-coin--c">${ART.coin(10)}</span>`
+        : `${ART.purse()}`;
+      card.innerHTML = `
+        <span class="mode-card-art mode-card-art--${mode.key}">${art}</span>
+        <span class="mode-card-body">
+          <span class="mode-card-name">${mode.name}</span>
+          <span class="mode-card-desc">${mode.desc}</span>
+          <span class="mode-card-progress">${ART.star()}${earned} / ${mode.levels.length * 3}</span>
+        </span>`;
+      card.onclick = () => openLevels(mode.key);
+      els.modeList.appendChild(card);
+    });
+    showScreen('screen-mode');
+    if (!REDUCE) {
+      gsap.fromTo(els.modeList.children, { y: 30, opacity: 0, scale: 0.9 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.55, stagger: 0.1, ease: 'back.out(1.7)' });
+    }
+  }
+
+  // ---------- レベル選択 ----------
+  function openLevels(modeKey) {
+    const mode = getMode(modeKey);
+    state.modeKey = modeKey;
+    els.levelsTitle.textContent = mode.name;
+    els.levelsNote.textContent = mode.note;
+    els.levelList.innerHTML = '';
+
+    mode.levels.forEach((level, i) => {
+      const unlocked = isUnlocked(modeKey, i);
+      const stars = progress[modeKey][i];
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `level-card ${unlocked ? '' : 'level-card--locked'}`;
+      card.disabled = !unlocked;
+      const starMarks = [0, 1, 2]
+        .map((n) => `<span class="${n < stars ? '' : 'star--empty'}">${ART.star()}</span>`).join('');
+      card.innerHTML = `
+        <span class="level-no">${i + 1}</span>
+        <span class="level-body">
+          <span class="level-name">${level.name}</span>
+          <span class="level-detail">${level.detail}</span>
+        </span>
+        ${unlocked ? `<span class="level-stars">${starMarks}</span>` : `<span class="level-lock">${ART.lock()}</span>`}`;
+      if (unlocked) card.onclick = () => startLevel(modeKey, i);
+      els.levelList.appendChild(card);
+    });
+
+    showScreen('screen-levels');
+    if (!REDUCE) {
+      gsap.fromTo(els.levelList.children, { x: -20, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.4, stagger: 0.06, ease: 'power3.out' });
+    }
+  }
+
+  // ---------- ゲーム開始 ----------
+  function startLevel(modeKey, levelIndex) {
+    state.modeKey = modeKey;
+    state.levelIndex = levelIndex;
+    state.questionIndex = 0;
+    state.score = 0;
+    state.combo = 0;
+    state.bestCount = 0;
+    generateQuestion();
+
     clearCatTimelines();
     els.gameMascot.innerHTML = ART.cat('idle');
     animateCat(els.gameMascot);
@@ -690,11 +870,6 @@
         { y: 0, opacity: 1, duration: 0.45, stagger: 0.06, ease: 'back.out(2)' });
       gsap.fromTo(els.gameMascot, { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: 'back.out(1.5)' });
     }
-  }
-
-  function resetGameState() {
-    state.level = 1; state.questionIndex = 0; state.score = 0; state.combo = 0; state.perfectCount = 0;
-    generateQuestion();
   }
 
   function initTitle() {
@@ -717,12 +892,14 @@
   }
 
   // ---------- イベント ----------
-  els.startBtn.addEventListener('click', () => { resetGameState(); startGameScreen(); });
-  els.restartBtn.addEventListener('click', () => { resetGameState(); startGameScreen(); });
-  els.nextLevelBtn.addEventListener('click', () => {
-    state.level += 1; state.questionIndex = 0; state.perfectCount = 0;
-    generateQuestion(); startGameScreen();
-  });
+  els.startBtn.addEventListener('click', openModes);
+  els.modeBackBtn.addEventListener('click', () => showScreen('screen-title'));
+  els.levelsBackBtn.addEventListener('click', openModes);
+  els.gameBackBtn.addEventListener('click', () => openLevels(state.modeKey));
+  els.clearToLevelsBtn.addEventListener('click', () => openLevels(state.modeKey));
+  els.finalToLevelsBtn.addEventListener('click', () => openLevels(state.modeKey));
+  els.finalToModesBtn.addEventListener('click', openModes);
+  els.nextLevelBtn.addEventListener('click', () => startLevel(state.modeKey, state.levelIndex + 1));
   els.payBtn.addEventListener('click', submitPayment);
   els.nextBtn.addEventListener('click', onNextClick);
 

@@ -30,12 +30,33 @@
     </div>
   </section>
 
+  <!-- モード選択画面 -->
+  <section id="screen-mode" class="screen">
+    <div class="sub-head">
+      <button class="icon-btn" id="modeBackBtn" aria-label="タイトルへもどる">←</button>
+      <h2 class="sub-title">モードを えらぼう</h2>
+    </div>
+    <div class="mode-list" id="modeList"></div>
+  </section>
+
+  <!-- レベル選択画面 -->
+  <section id="screen-levels" class="screen">
+    <div class="sub-head">
+      <button class="icon-btn" id="levelsBackBtn" aria-label="モードをえらぶ">←</button>
+      <h2 class="sub-title" id="levelsTitle">じゆうに はらう</h2>
+    </div>
+    <p class="levels-note" id="levelsNote"></p>
+    <div class="level-list" id="levelList"></div>
+  </section>
+
   <!-- ゲーム画面 -->
   <section id="screen-game" class="screen">
+    <div class="game-topbar">
+      <button class="icon-btn" id="gameBackBtn" aria-label="レベルをえらぶ">←</button>
+      <span class="game-levelname" id="gameLevelName"></span>
+    </div>
+
     <header class="game-header">
-      <div class="hud-item" id="hudLevel">
-        <span class="hud-label">レベル</span><span class="hud-value" id="levelValue">1</span>
-      </div>
       <div class="hud-item" id="hudQuestion">
         <span class="hud-label">もんだい</span><span class="hud-value" id="questionValue">1/5</span>
       </div>
@@ -91,6 +112,7 @@
       <div class="stars" id="clearStars"></div>
       <div class="clear-score">スコア：<span id="clearScore">0</span></div>
       <button class="btn btn-primary btn-big" id="nextLevelBtn">つぎの レベルへ</button>
+      <button class="btn btn-sub" id="clearToLevelsBtn">レベルを えらぶ</button>
     </div>
   </section>
 
@@ -98,10 +120,11 @@
   <section id="screen-finalclear" class="screen">
     <div class="clear-card">
       <div class="final-trophy" id="finalTrophy"></div>
-      <div class="clear-title">ぜんぶ クリア！<br>おめでとう！</div>
-      <div class="clear-score">さいしゅうスコア：<span id="finalScore">0</span></div>
-      <button class="btn btn-primary btn-big" id="restartBtn">もういちど あそぶ</button>
-      <a href="../" class="btn-link">← ゲームポータルへ もどる</a>
+      <div class="clear-title"><span id="finalModeName">じゆうに はらう</span><br>ぜんぶ クリア！</div>
+      <div class="stars" id="finalStars"></div>
+      <div class="clear-score">スコア：<span id="finalScore">0</span></div>
+      <button class="btn btn-primary btn-big" id="finalToLevelsBtn">レベルを えらぶ</button>
+      <button class="btn btn-sub" id="finalToModesBtn">モードを えらぶ</button>
     </div>
   </section>
 

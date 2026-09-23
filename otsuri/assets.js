@@ -333,6 +333,30 @@ window.ART = (() => {
     </svg>`;
   }
 
+  function lock() {
+    return `<svg class="lock-svg" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M20 30v-8a12 12 0 0 1 24 0v8" fill="none" stroke="#b6a596" stroke-width="7" stroke-linecap="round"/>
+      <rect x="12" y="28" width="40" height="30" rx="8" fill="#d9c9ba"/>
+      <rect x="12" y="28" width="40" height="30" rx="8" fill="none" stroke="#c0ac9a" stroke-width="2"/>
+      <circle cx="32" cy="40" r="5" fill="#8d7a68"/>
+      <rect x="30" y="42" width="4" height="9" rx="2" fill="#8d7a68"/>
+    </svg>`;
+  }
+
+  function purse() {
+    const u = nid('pu');
+    return `<svg class="art-svg" viewBox="0 0 64 64" aria-hidden="true">
+      <defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffa9cb"/><stop offset="1" stop-color="#e8558f"/></linearGradient></defs>
+      <path d="M19 24c0-7 6-13 13-13s13 6 13 13" fill="none" stroke="#dd8fb2" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M11 23h42c3 0 5 2 5 5v20c0 5-4 9-9 9H15c-5 0-9-4-9-9V28c0-3 2-5 5-5z" fill="url(#${u})"/>
+      <path d="M6 33h52v7H6z" fill="#fff" opacity=".2"/>
+      <circle cx="32" cy="40" r="7" fill="#ffd166" stroke="#e0a91f" stroke-width="2"/>
+      <text x="32" y="41" text-anchor="middle" dominant-baseline="central" font-family="Mochiy Pop One, sans-serif" font-size="8" fill="#a57c10">¥</text>
+      <ellipse cx="19" cy="30" rx="6" ry="3.4" fill="#fff" opacity=".35" transform="rotate(-18 19 30)"/>
+    </svg>`;
+  }
+
   function sparkle(color = '#ffd166') {
     return `<svg class="spark-svg" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 0c1 7 4 10 12 12-8 2-11 5-12 12-1-7-4-10-12-12C8 10 11 7 12 0z" fill="${color}"/></svg>`;
@@ -343,5 +367,5 @@ window.ART = (() => {
     if (g) g.innerHTML = catFace(mood);
   }
 
-  return { coin, item, ITEM_LIST, cat, catHead, faceBadge, star, trophy, sparkle, setMood };
+  return { coin, item, ITEM_LIST, cat, catHead, faceBadge, star, trophy, sparkle, setMood, purse, lock };
 })();
