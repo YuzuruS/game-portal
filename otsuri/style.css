@@ -304,6 +304,14 @@ body {
 .coin-btn::after, .coin-chip::after {
   content: ''; position: absolute; inset: -6px; border-radius: 50%;
 }
+/* コインを取り出した跡（並びがずれないようにする） */
+.coin-slot {
+  display: block; width: 62px; height: 62px; border-radius: 50%;
+  background: rgba(150, 110, 70, .07);
+  box-shadow: inset 0 2px 5px rgba(140, 90, 60, .17);
+}
+.coin-slot--500 { width: 68px; height: 68px; }
+
 .coin-btn { width: 62px; height: 62px; }
 .coin-btn.coin-500 { width: 68px; height: 68px; }
 .coin-chip { width: 46px; height: 46px; }
@@ -357,8 +365,8 @@ body {
 .fx-item svg { display: block; }
 
 @media (max-width: 380px) {
-  .coin-btn { width: 54px; height: 54px; }
-  .coin-btn.coin-500 { width: 60px; height: 60px; }
+  .coin-btn, .coin-slot { width: 54px; height: 54px; }
+  .coin-btn.coin-500, .coin-slot--500 { width: 60px; height: 60px; }
   .game-title { font-size: 2.1rem; }
   .mascot { width: 92px; }
 }
