@@ -90,6 +90,7 @@ body {
 
 /* ---------- タイトル画面 ---------- */
 #screen-title { align-items: center; justify-content: center; text-align: center; }
+#screen-mode, #screen-levels { justify-content: flex-start; }
 .title-card { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 .title-mascot { width: 190px; filter: drop-shadow(0 14px 16px rgba(150, 100, 70, .24)); }
 .title-mascot svg { width: 100%; height: auto; display: block; }
@@ -103,6 +104,98 @@ body {
 .title-line--1 { color: #ff9f4a; -webkit-text-stroke: 7px #fff; paint-order: stroke fill; filter: drop-shadow(0 4px 0 #e9822b); }
 .title-line--2 { color: var(--pink); -webkit-text-stroke: 7px #fff; paint-order: stroke fill; filter: drop-shadow(0 4px 0 var(--pink-deep)); }
 .game-subtitle { color: var(--ink-soft); font-size: .95rem; font-weight: 700; margin-bottom: 8px; }
+
+/* ---------- サブ画面の見出し ---------- */
+.sub-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.sub-title {
+  font-family: 'Mochiy Pop One', sans-serif; font-size: 1.3rem; color: var(--pink-dark);
+}
+.icon-btn {
+  width: 42px; height: 42px; flex-shrink: 0;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: var(--white); color: var(--pink-dark);
+  font-size: 1.3rem; line-height: 1; font-weight: 800;
+  box-shadow: 0 4px 0 rgba(213, 180, 150, .5), 0 8px 14px rgba(150, 100, 70, .14);
+  transition: transform .08s ease, box-shadow .08s ease;
+  touch-action: manipulation;
+}
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(213, 180, 150, .5); }
+
+.btn-sub {
+  background: var(--white); color: var(--pink-dark);
+  box-shadow: 0 5px 0 #f3d3e0, 0 10px 16px rgba(150, 100, 70, .14);
+  font-size: .95rem; padding: 12px 24px;
+}
+.btn-sub::after { display: none; }
+.btn-sub:active:not(:disabled) { box-shadow: 0 1px 0 #f3d3e0; }
+
+/* ---------- モード選択 ---------- */
+.mode-list { display: flex; flex-direction: column; gap: 16px; }
+.mode-card {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  background: var(--white); border: none; border-radius: var(--r-lg);
+  padding: 16px 18px; cursor: pointer; width: 100%;
+  box-shadow: 0 7px 0 rgba(213, 180, 150, .45), var(--card-shadow);
+  transition: transform .1s ease, box-shadow .1s ease;
+  touch-action: manipulation;
+}
+.mode-card:active { transform: translateY(4px); box-shadow: 0 3px 0 rgba(213, 180, 150, .45); }
+.mode-card--wallet { background: linear-gradient(160deg, #fffdf8, #fff2f7); }
+.mode-card-art { width: 80px; flex-shrink: 0; }
+.mode-card-art svg { width: 100%; height: auto; display: block; }
+.mode-card-art--free { position: relative; height: 72px; }
+.mini-coin { position: absolute; width: 46px; }
+.mini-coin svg { filter: drop-shadow(0 3px 3px rgba(120, 85, 50, .3)); }
+.mini-coin--a { left: 0; top: 16px; transform: rotate(-16deg); }
+.mini-coin--b { left: 17px; top: 3px; transform: rotate(5deg); }
+.mini-coin--c { left: 33px; top: 22px; transform: rotate(18deg); }
+.mode-card-art--wallet svg { filter: drop-shadow(0 4px 5px rgba(150, 100, 70, .25)); }
+.mode-card-body { flex: 1; min-width: 0; display: block; }
+.mode-card-name { display: block; font-family: 'Mochiy Pop One', sans-serif; font-size: 1.12rem; color: var(--pink-dark); line-height: 1.35; }
+.mode-card-desc { display: block; font-size: .78rem; color: var(--ink-soft); font-weight: 700; margin-top: 3px; line-height: 1.5; }
+.mode-card-progress {
+  display: flex; align-items: center; gap: 4px; margin-top: 7px;
+  font-size: .8rem; font-weight: 800; color: var(--yellow-dark);
+}
+.mode-card-progress .star-svg { width: 18px; height: 18px; }
+
+/* ---------- レベル選択 ---------- */
+.levels-note { font-size: .82rem; color: var(--ink-soft); font-weight: 700; margin-bottom: 12px; }
+.level-list { display: flex; flex-direction: column; gap: 11px; }
+.level-card {
+  display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;
+  background: var(--white); border: none; border-radius: var(--r-md);
+  padding: 12px 14px; cursor: pointer;
+  box-shadow: 0 6px 0 rgba(213, 180, 150, .42), 0 8px 18px rgba(150, 100, 70, .12);
+  transition: transform .1s ease, box-shadow .1s ease;
+  touch-action: manipulation;
+}
+.level-card:active:not(.level-card--locked) { transform: translateY(4px); box-shadow: 0 2px 0 rgba(213, 180, 150, .42); }
+.level-card--locked { opacity: .55; cursor: not-allowed; filter: saturate(.4); }
+.level-no {
+  width: 44px; height: 44px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: linear-gradient(180deg, #ffd9e8, #ffb3d1);
+  font-family: 'Mochiy Pop One', sans-serif; font-size: 1.2rem; color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(185, 58, 108, .25);
+}
+.level-card--locked .level-no { background: linear-gradient(180deg, #e4dcd4, #cdc2b8); }
+.level-body { flex: 1; min-width: 0; display: block; }
+.level-name { display: block; font-weight: 800; font-size: .96rem; line-height: 1.35; }
+.level-detail { display: block; font-size: .74rem; color: var(--ink-soft); font-weight: 700; margin-top: 2px; }
+.level-stars { display: flex; gap: 2px; flex-shrink: 0; }
+.level-stars .star-svg { width: 20px; height: 20px; }
+.level-stars .star--empty { opacity: .28; filter: grayscale(1); }
+.level-lock { width: 24px; flex-shrink: 0; }
+.level-lock svg { width: 100%; height: auto; display: block; }
+.level-stars > span { display: block; }
+
+/* ---------- ゲーム画面のトップバー ---------- */
+.game-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.game-levelname {
+  font-weight: 800; font-size: .9rem; color: var(--ink-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ---------- HUD ---------- */
 .game-header { display: flex; gap: 7px; margin-bottom: 12px; }
@@ -255,6 +348,7 @@ body {
 .stars .star svg { width: 100%; height: auto; display: block; }
 .stars .star--empty { filter: grayscale(1) opacity(.3); }
 .clear-score { font-family: 'Mochiy Pop One', sans-serif; font-size: 1.1rem; color: var(--ink-soft); }
+.clear-card .btn-sub { margin-top: -2px; }
 
 /* ---------- エフェクトレイヤー ---------- */
 .confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
