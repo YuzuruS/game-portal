@@ -129,6 +129,7 @@
   const state = {
     modeKey: 'free', levelIndex: 0, questionIndex: 0, score: 0, combo: 0, bestCount: 0,
     price: 0, product: ART.ITEM_LIST[0], originalHand: {}, busy: false,
+    minTrayH: 0, minWalletH: 0,
   };
   let pendingRetry = false;
 
@@ -383,8 +384,10 @@
     els.questionValue.textContent = `${state.questionIndex + 1}/${QUESTIONS_PER_LEVEL}`;
     els.wallet.innerHTML = '';
     els.wallet.style.height = '';
+    els.wallet.style.minHeight = '';
     els.coinTray.style.minHeight = '';
     renderCoinTray(level);
+    reserveHeights();
     updateTotals(false);
     updateHud(false);
     setMood(els.gameMascot, 'idle');
@@ -417,6 +420,21 @@
     el.dataset.value = value;
     el.innerHTML = ART.coin(value);
     return el;
+  }
+
+  // 問題が変わってもボタンの位置が上に跳ねないよう、さいふとトレイの高さは
+  // そのレベル中に必要だった最大の高さを保つ（縮めない）。
+  function reserveHeights() {
+    const trayH = els.coinTray.getBoundingClientRect().height;
+    if (trayH > state.minTrayH) state.minTrayH = trayH;
+    if (state.minTrayH > 0) els.coinTray.style.minHeight = `${state.minTrayH}px`;
+    growWalletReserve();
+  }
+
+  function growWalletReserve() {
+    const walletH = els.wallet.getBoundingClientRect().height;
+    if (walletH > state.minWalletH) state.minWalletH = walletH;
+    if (state.minWalletH > 0) els.wallet.style.minHeight = `${state.minWalletH}px`;
   }
 
   // コインを取り出した跡に置く空きスロット（トレイの並びをずらさないため）
@@ -571,6 +589,7 @@
   }
 
   function updateTotals(animate = true) {
+    growWalletReserve();
     const total = getSelectedTotal();
     if (animate && !REDUCE) {
       tickNumber(els.totalValue, total, 0.35);
@@ -917,6 +936,8 @@
     state.score = 0;
     state.combo = 0;
     state.bestCount = 0;
+    state.minTrayH = 0;
+    state.minWalletH = 0;
     generateQuestion();
 
     clearCatTimelines();
