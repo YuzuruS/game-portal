@@ -473,8 +473,10 @@
     if (REDUCE) { mutate(); return; }
     const flipState = Flip.getState(allCoinEls());
     mutate();
+    // absolute: true にするとアニメ中だけコインが浮いてしまい、
+    // さいふやトレイの高さがつぶれてボタンが上下にずれるので使わない。
     Flip.from(flipState, {
-      duration: 0.55, ease: 'back.out(1.1)', absolute: true, scale: true,
+      duration: 0.55, ease: 'back.out(1.1)', scale: true,
       onEnter: (e) => gsap.fromTo(e, { scale: 0 }, { scale: 1, duration: 0.4, ease: 'back.out(2)' }),
     });
     if (mover) spinInner(mover);
