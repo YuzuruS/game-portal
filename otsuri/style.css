@@ -105,8 +105,22 @@ body {
 .title-line--2 { color: var(--pink); -webkit-text-stroke: 7px #fff; paint-order: stroke fill; filter: drop-shadow(0 4px 0 var(--pink-deep)); }
 .game-subtitle { color: var(--ink-soft); font-size: .95rem; font-weight: 700; margin-bottom: 8px; }
 
+/* ---------- おと の オン・オフ ---------- */
+.mute-btn {
+  position: fixed; top: 12px; right: 12px; z-index: 70;
+  width: 40px; height: 40px; padding: 8px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 253, 248, .92); color: var(--pink-dark);
+  box-shadow: 0 3px 0 rgba(213, 180, 150, .5), 0 6px 12px rgba(150, 100, 70, .16);
+  transition: transform .08s ease, box-shadow .08s ease;
+  touch-action: manipulation;
+}
+.mute-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(213, 180, 150, .5); }
+.mute-btn.is-muted { color: #b9a596; }
+.mute-btn svg { width: 100%; height: 100%; display: block; }
+
 /* ---------- サブ画面の見出し ---------- */
-.sub-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.sub-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-right: 48px; }
 .sub-title {
   font-family: 'Mochiy Pop One', sans-serif; font-size: 1.3rem; color: var(--pink-dark);
 }
@@ -191,7 +205,7 @@ body {
 .level-stars > span { display: block; }
 
 /* ---------- ゲーム画面のトップバー ---------- */
-.game-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.game-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-right: 48px; }
 .game-levelname {
   font-weight: 800; font-size: .9rem; color: var(--ink-soft);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

@@ -155,6 +155,30 @@
 
   const burst = window.confetti.create($('confettiCanvas'), { resize: true, useWorker: true });
 
+  // ---------- 効果音 ----------
+  const sfx = (name, arg) => { if (window.SFX) window.SFX.play(name, arg); };
+  const muteBtn = $('muteBtn');
+
+  function renderMuteBtn() {
+    const muted = window.SFX ? window.SFX.isMuted() : true;
+    muteBtn.innerHTML = ART.speaker(!muted);
+    muteBtn.classList.toggle('is-muted', muted);
+    muteBtn.setAttribute('aria-pressed', String(muted));
+  }
+
+  if (window.SFX) {
+    renderMuteBtn();
+    muteBtn.addEventListener('click', () => {
+      const muted = window.SFX.setMuted(!window.SFX.isMuted());
+      renderMuteBtn();
+      if (!muted) sfx('select');
+    });
+    // 最初の操作で音を鳴らせるようにする（ブラウザの自動再生制限のため）
+    const unlockAudio = () => window.SFX.unlock();
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+  }
+
   // ---------- 汎用アニメーション ----------
   function rectOf(el) { return el.getBoundingClientRect(); }
   function centerOf(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
@@ -366,6 +390,7 @@
     setMood(els.gameMascot, 'idle');
 
     if (animate && !REDUCE) {
+      sfx('question');
       els.priceValue.textContent = '0';
       const tl = gsap.timeline();
       tl.fromTo(els.speechBubble, { scale: 0.6, opacity: 0, transformOrigin: 'left center' },
@@ -441,6 +466,7 @@
   function selectLimited(el, value) {
     if (state.busy || el.dataset.flying === '1') return;
     el.dataset.flying = '1';
+    sfx('coinUp');
     const slot = createSlot(value);
     el.parentNode.insertBefore(slot, el);
     el.__slot = slot;
@@ -456,6 +482,7 @@
   function deselectLimited(el, value) {
     if (state.busy || el.dataset.flying === '1') return;
     el.dataset.flying = '1';
+    sfx('coinDown');
     const slot = el.__slot;
     el.__slot = null;
     flipCoins(() => {
@@ -471,6 +498,7 @@
   // 枚数無制限：トレイのコインは残り、複製が財布へ飛ぶ
   function selectUnlimited(sourceEl, value) {
     if (state.busy) return;
+    sfx('coinUp');
     const startRect = rectOf(sourceEl);
     const siblings = REDUCE ? null : Flip.getState([...els.wallet.children]);
 
@@ -503,6 +531,7 @@
   function deselectUnlimited(chip, sourceEl, value) {
     if (state.busy || chip.dataset.flying === '1') return;
     chip.dataset.flying = '1';
+    sfx('coinDown');
 
     if (REDUCE) { chip.remove(); updateTotals(); return; }
 
@@ -580,6 +609,7 @@
 
     // 1枚ずつ外すと残りのコインが詰めて動いてしまうので、
     // 先に全部の位置を測ってから、まとめて切り離す。
+    sfx('pay');
     const rects = chips.map((chip) => rectOf(chip));
     // 支払い中にさいふが縮んで下のボタンが動かないよう高さを固定する
     els.wallet.style.height = `${rectOf(els.wallet).height}px`;
@@ -660,6 +690,7 @@
     els.feedbackText.textContent = conf.title;
     if (result.status === 'insufficient') {
       els.feedbackSub.textContent = `あと ${result.short}えん たりません`;
+      sfx('miss');
       els.nextBtn.textContent = 'もういちど';
       pendingRetry = true;
     } else {
@@ -667,12 +698,15 @@
       els.nextBtn.textContent = 'つぎへ';
       if (result.status === 'perfect') {
         els.feedbackSub.textContent = conf.sub;
+        sfx('perfect');
         state.score += 100; state.combo += 1; state.bestCount += 1;
       } else if (result.status === 'good') {
         els.feedbackSub.textContent = `おつりは ${result.change}えん（${result.changeCoins}まい）\nこれいじょう すくなく できないよ！`;
+        sfx('good');
         state.score += 80; state.combo += 1; state.bestCount += 1;
       } else {
         els.feedbackSub.textContent = `おつりが ${result.changeCoins}まいに なったよ\nさいしょうは ${result.minCoins}まい！`;
+        sfx('close');
         state.score += 30; state.combo = 0;
       }
       updateHud();
@@ -757,6 +791,7 @@
         onStart: () => {
           if (!el.classList.contains('star--empty')) {
             const c = centerOf(rectOf(el));
+            sfx('star', i);
             gsap.delayedCall(0.12, () => sparkleAt(c.x, c.y, 6));
           }
         },
@@ -786,6 +821,7 @@
     els.clearScore.textContent = '0';
     renderStars(els.clearStars, stars);
     showScreen('screen-levelclear');
+    sfx('levelClear');
     celebrate('clear');
     tickNumber(els.clearScore, state.score, 1.1);
     if (!REDUCE) {
@@ -799,6 +835,7 @@
     els.finalScore.textContent = '0';
     renderStars(els.finalStars, stars);
     showScreen('screen-finalclear');
+    sfx('modeClear');
     celebrate('clear');
     tickNumber(els.finalScore, state.score, 1.2);
     if (!REDUCE) {
@@ -827,7 +864,7 @@
           <span class="mode-card-desc">${mode.desc}</span>
           <span class="mode-card-progress">${ART.star()}${earned} / ${mode.levels.length * 3}</span>
         </span>`;
-      card.onclick = () => openLevels(mode.key);
+      card.onclick = () => { sfx('select'); openLevels(mode.key); };
       els.modeList.appendChild(card);
     });
     showScreen('screen-mode');
@@ -861,7 +898,7 @@
           <span class="level-detail">${level.detail}</span>
         </span>
         ${unlocked ? `<span class="level-stars">${starMarks}</span>` : `<span class="level-lock">${ART.lock()}</span>`}`;
-      if (unlocked) card.onclick = () => startLevel(modeKey, i);
+      if (unlocked) card.onclick = () => { sfx('select'); startLevel(modeKey, i); };
       els.levelList.appendChild(card);
     });
 
@@ -914,16 +951,16 @@
   }
 
   // ---------- イベント ----------
-  els.startBtn.addEventListener('click', openModes);
-  els.modeBackBtn.addEventListener('click', () => showScreen('screen-title'));
-  els.levelsBackBtn.addEventListener('click', openModes);
-  els.gameBackBtn.addEventListener('click', () => openLevels(state.modeKey));
-  els.clearToLevelsBtn.addEventListener('click', () => openLevels(state.modeKey));
-  els.finalToLevelsBtn.addEventListener('click', () => openLevels(state.modeKey));
-  els.finalToModesBtn.addEventListener('click', openModes);
-  els.nextLevelBtn.addEventListener('click', () => startLevel(state.modeKey, state.levelIndex + 1));
+  els.startBtn.addEventListener('click', () => { sfx('select'); openModes(); });
+  els.modeBackBtn.addEventListener('click', () => { sfx('back'); showScreen('screen-title'); });
+  els.levelsBackBtn.addEventListener('click', () => { sfx('back'); openModes(); });
+  els.gameBackBtn.addEventListener('click', () => { sfx('back'); openLevels(state.modeKey); });
+  els.clearToLevelsBtn.addEventListener('click', () => { sfx('select'); openLevels(state.modeKey); });
+  els.finalToLevelsBtn.addEventListener('click', () => { sfx('select'); openLevels(state.modeKey); });
+  els.finalToModesBtn.addEventListener('click', () => { sfx('select'); openModes(); });
+  els.nextLevelBtn.addEventListener('click', () => { sfx('select'); startLevel(state.modeKey, state.levelIndex + 1); });
   els.payBtn.addEventListener('click', submitPayment);
-  els.nextBtn.addEventListener('click', onNextClick);
+  els.nextBtn.addEventListener('click', () => { sfx('tap'); onNextClick(); });
 
   // --- コインのタップ処理 ---
   // clickイベントだけに頼ると、スマホでスクロール判定に吸われたときに
