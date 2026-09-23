@@ -333,6 +333,17 @@ window.ART = (() => {
     </svg>`;
   }
 
+  function speaker(on = true) {
+    return `<svg class="speaker-svg" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M14 26h9l13-10c1.6-1.3 4-.2 4 1.9v28.2c0 2.1-2.4 3.2-4 1.9L23 38h-9c-1.7 0-3-1.3-3-3V29c0-1.7 1.3-3 3-3z" fill="currentColor"/>
+      ${on
+        ? `<g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+             <path d="M45 24c3.4 2.4 3.4 13.6 0 16"/><path d="M52 18c6.4 5 6.4 23 0 28"/></g>`
+        : `<g stroke="currentColor" stroke-width="4.6" stroke-linecap="round">
+             <path d="M46 25l13 14"/><path d="M59 25L46 39"/></g>`}
+    </svg>`;
+  }
+
   function lock() {
     return `<svg class="lock-svg" viewBox="0 0 64 64" aria-hidden="true">
       <path d="M20 30v-8a12 12 0 0 1 24 0v8" fill="none" stroke="#b6a596" stroke-width="7" stroke-linecap="round"/>
@@ -367,5 +378,5 @@ window.ART = (() => {
     if (g) g.innerHTML = catFace(mood);
   }
 
-  return { coin, item, ITEM_LIST, cat, catHead, faceBadge, star, trophy, sparkle, setMood, purse, lock };
+  return { coin, item, ITEM_LIST, cat, catHead, faceBadge, star, trophy, sparkle, setMood, purse, lock, speaker };
 })();
