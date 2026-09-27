@@ -69,6 +69,8 @@ window.SFX = (() => {
     noiseBurst({ dur: 0.035, vol: vol * 0.4, freq: base * 1.4, when });
   }
 
+  const semi = (f, n) => f * Math.pow(2, n / 12);
+
   const NOTE = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, B5: 987.77, C6: 1046.5, D6: 1174.7, E6: 1318.5, G6: 1568 };
 
   // ---- 効果音 ----
@@ -89,17 +91,45 @@ window.SFX = (() => {
       tone({ freq: 520, to: 1040, dur: 0.22, type: 'sine', vol: 0.12, when: 0.02 });
     },
     question() { tone({ freq: 880, to: 1170, dur: 0.14, type: 'sine', vol: 0.14 }); },
-    perfect() {
+    // combo が増えるほど音程が上がり、音も厚くなる
+    perfect(combo = 1) {
+      const up = Math.min(Math.max(combo - 1, 0), 5) * 2;
       [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6].forEach((f, i) => {
-        tone({ freq: f, dur: 0.3, type: 'triangle', vol: 0.22, when: i * 0.075 });
-        tone({ freq: f * 2, dur: 0.22, type: 'sine', vol: 0.09, when: i * 0.075 });
+        tone({ freq: semi(f, up), dur: 0.3, type: 'triangle', vol: 0.22, when: i * 0.075 });
+        tone({ freq: semi(f * 2, up), dur: 0.22, type: 'sine', vol: 0.09, when: i * 0.075 });
       });
-      tone({ freq: NOTE.E6, dur: 0.5, type: 'sine', vol: 0.12, when: 0.32 });
+      tone({ freq: semi(NOTE.E6, up), dur: 0.5, type: 'sine', vol: 0.12, when: 0.32 });
+      if (combo >= 3) {
+        tone({ freq: semi(NOTE.C5 / 2, up), dur: 0.5, type: 'square', vol: 0.06, when: 0.3 });
+        [NOTE.G6, NOTE.C6 * 2].forEach((f, i) => tone({ freq: semi(f, up), dur: 0.18, type: 'sine', vol: 0.07, when: 0.4 + i * 0.06 }));
+      }
+      if (combo >= 4) noiseBurst({ dur: 0.35, vol: 0.06, freq: 7000, q: 0.8, when: 0.3 });
     },
-    good() {
-      tone({ freq: NOTE.E5, dur: 0.16, type: 'triangle', vol: 0.2 });
-      tone({ freq: NOTE.A5, dur: 0.28, type: 'triangle', vol: 0.2, when: 0.1 });
-      tone({ freq: NOTE.A5 * 2, dur: 0.2, type: 'sine', vol: 0.07, when: 0.1 });
+    good(combo = 1) {
+      const up = Math.min(Math.max(combo - 1, 0), 5) * 2;
+      tone({ freq: semi(NOTE.E5, up), dur: 0.16, type: 'triangle', vol: 0.2 });
+      tone({ freq: semi(NOTE.A5, up), dur: 0.28, type: 'triangle', vol: 0.2, when: 0.1 });
+      tone({ freq: semi(NOTE.A5 * 2, up), dur: 0.2, type: 'sine', vol: 0.07, when: 0.1 });
+    },
+    // コンボ段階が上がったときのファンファーレ
+    comboUp(tier = 1) {
+      tone({ freq: 400, to: 1600 + tier * 300, dur: 0.35, type: 'sawtooth', vol: 0.05 });
+      const base = semi(NOTE.C5, tier * 2);
+      [0, 4, 7, 12, 16].slice(0, 3 + tier).forEach((n, i) => {
+        tone({ freq: semi(base, n), dur: 0.26, type: 'square', vol: 0.06, when: 0.18 + i * 0.06 });
+        tone({ freq: semi(base * 2, n), dur: 0.3, type: 'triangle', vol: 0.12, when: 0.18 + i * 0.06 });
+      });
+    },
+    // スコアにコインが入るたびの「チャリン」。n 枚目ほど高くなる
+    dopa(n = 0) { clink({ vol: 0.13, base: 2200 + Math.min(n, 14) * 90 }); },
+    flash() {
+      noiseBurst({ dur: 0.3, vol: 0.14, freq: 1800, q: 0.6 });
+      tone({ freq: 1600, to: 300, dur: 0.3, type: 'sine', vol: 0.08 });
+    },
+    fever() {
+      [0, 0.1, 0.2, 0.3].forEach((w, i) => tone({ freq: semi(NOTE.C5, i * 4), dur: 0.14, type: 'square', vol: 0.08, when: w }));
+      [NOTE.C6, NOTE.E6, NOTE.G6].forEach((f) => tone({ freq: f, dur: 0.8, type: 'triangle', vol: 0.12, when: 0.42 }));
+      noiseBurst({ dur: 0.6, vol: 0.08, freq: 5000, q: 0.5, when: 0.42 });
     },
     close() {
       tone({ freq: 520, dur: 0.14, type: 'triangle', vol: 0.16 });
@@ -129,6 +159,45 @@ window.SFX = (() => {
     },
   };
 
+  // ---- フィーバーBGM（ループ） ----
+  // 先読みスケジューラで16分音符を並べる。テンポは速め。
+  const FEVER_STEP = 60 / 168 / 4;
+  const FEVER_BASS = [0, 0, 12, 0, 5, 5, 17, 5, 7, 7, 19, 7, 5, 5, 17, 5];
+  const FEVER_LEAD = [0, 4, 7, 12, 16, 12, 7, 4, 5, 9, 12, 17, 19, 17, 12, 9];
+  let feverTimer = null;
+  let feverNext = 0;
+  let feverStepNo = 0;
+
+  function feverTick() {
+    if (!ctx) return;
+    while (feverNext < ctx.currentTime + 0.2) {
+      const when = Math.max(0, feverNext - ctx.currentTime);
+      const i = feverStepNo % 16;
+      const bar = Math.floor(feverStepNo / 16) % 2;
+      tone({ freq: semi(NOTE.C5 / 4, FEVER_BASS[i] + bar * 2), dur: FEVER_STEP * 0.9, type: 'square', vol: 0.05, when });
+      tone({ freq: semi(NOTE.C5, FEVER_LEAD[i] + bar * 2), dur: FEVER_STEP * 0.8, type: 'triangle', vol: 0.08, when });
+      if (i % 4 === 0) tone({ freq: 140, to: 45, dur: 0.12, type: 'sine', vol: 0.22, when });
+      if (i % 2 === 1) noiseBurst({ dur: 0.03, vol: 0.05, freq: 8000, q: 1, when });
+      if (i % 8 === 4) noiseBurst({ dur: 0.1, vol: 0.09, freq: 1800, q: 0.7, when });
+      feverNext += FEVER_STEP;
+      feverStepNo += 1;
+    }
+  }
+
+  function startFever() {
+    stopFever();
+    if (muted || !ensure()) return;
+    feverNext = ctx.currentTime + 0.05;
+    feverStepNo = 0;
+    feverTick();
+    feverTimer = setInterval(feverTick, 50);
+  }
+
+  function stopFever() {
+    if (feverTimer) clearInterval(feverTimer);
+    feverTimer = null;
+  }
+
   function play(name, arg) {
     if (muted) return;
     const fn = SOUNDS[name];
@@ -142,8 +211,9 @@ window.SFX = (() => {
     muted = !!next;
     try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (e) { /* 保存できなくても続行 */ }
     if (!muted) ensure();
+    else stopFever();
     return muted;
   }
 
-  return { play, unlock, setMuted, isMuted: () => muted };
+  return { play, unlock, setMuted, isMuted: () => muted, startFever, stopFever };
 })();

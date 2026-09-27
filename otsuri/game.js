@@ -152,6 +152,10 @@
     finalScore: $('finalScore'), finalTrophy: $('finalTrophy'), titleMascot: $('titleMascot'),
     speechBubble: $('speechBubble'), shopScene: document.querySelector('.shop-scene'),
     fxLayer: $('fxLayer'), skyLayer: $('skyLayer'), app: $('app'),
+    hudScore: $('hudScore'), paymentPanel: document.querySelector('.payment-panel'),
+    gameHeader: document.querySelector('.game-header'),
+    feverOverlay: $('feverOverlay'), feverTitle: $('feverTitle'), feverMascot: $('feverMascot'),
+    feverBadge: $('feverBadge'), feverBonus: $('feverBonus'), feverNextBtn: $('feverNextBtn'),
   };
 
   const burst = window.confetti.create($('confettiCanvas'), { resize: true, useWorker: true });
@@ -324,6 +328,7 @@
     document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
     const next = $(id);
     next.classList.add('active');
+    if (id !== 'screen-game') document.body.classList.remove('is-rainbow');
     gsap.fromTo(next, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: D(0.38), ease: 'power2.out' });
   }
 
@@ -678,21 +683,148 @@
     }
   }
 
-  function celebrate(level) {
+  function celebrate(level, tier = 0) {
     if (REDUCE) return;
     const opts = { colors: PARTY_COLORS, disableForReducedMotion: true };
-    if (level === 'perfect') {
-      burst({ ...opts, particleCount: 110, spread: 95, startVelocity: 46, origin: { x: 0.5, y: 0.6 } });
-      gsap.delayedCall(0.18, () => burst({ ...opts, particleCount: 60, angle: 60, spread: 70, origin: { x: 0, y: 0.75 } }));
-      gsap.delayedCall(0.32, () => burst({ ...opts, particleCount: 60, angle: 120, spread: 70, origin: { x: 1, y: 0.75 } }));
-      coinRain(16);
-    } else if (level === 'good') {
-      burst({ ...opts, particleCount: 55, spread: 70, startVelocity: 36, origin: { x: 0.5, y: 0.62 } });
+    const k = 1 + tier * 0.6; // コンボが上がるほど紙吹雪が増える
+    if (level === 'perfect' || level === 'good') {
+      const base = level === 'perfect' ? 110 : 55;
+      burst({ ...opts, particleCount: Math.round(base * k), spread: 95 + tier * 20, startVelocity: 46 + tier * 6, origin: { x: 0.5, y: 0.6 } });
+      if (level === 'perfect' || tier >= 1) {
+        gsap.delayedCall(0.18, () => burst({ ...opts, particleCount: Math.round(60 * k), angle: 60, spread: 70, origin: { x: 0, y: 0.75 } }));
+        gsap.delayedCall(0.32, () => burst({ ...opts, particleCount: Math.round(60 * k), angle: 120, spread: 70, origin: { x: 1, y: 0.75 } }));
+      }
+      if (tier >= 2) {
+        gsap.delayedCall(0.5, () => burst({ ...opts, particleCount: 80, spread: 360, startVelocity: 32, shapes: ['star'], scalar: 1.4, origin: { x: 0.5, y: 0.4 } }));
+      }
+      if (tier >= 3) {
+        gsap.delayedCall(0.7, () => burst({ ...opts, particleCount: 150, angle: 270, spread: 140, startVelocity: 20, gravity: 0.6, origin: { x: 0.5, y: -0.1 } }));
+      }
+      if (level === 'perfect' || tier >= 1) coinRain(tier >= 3 ? 45 : 16 + tier * 8);
     } else if (level === 'clear') {
       burst({ ...opts, particleCount: 130, spread: 110, startVelocity: 50, origin: { x: 0.5, y: 0.65 } });
       gsap.delayedCall(0.4, () => burst({ ...opts, particleCount: 90, spread: 120, origin: { x: 0.5, y: 0.5 } }));
       coinRain(20);
     }
+  }
+
+  // ---------- コンボ演出 ----------
+  // 1レベル5もんの中で 2・3・4コンボと段階が上がり、演出がどんどん派手になる
+  const comboTier = (combo) => (combo >= 4 ? 3 : combo >= 3 ? 2 : combo >= 2 ? 1 : 0);
+  const TIER_WORDS = ['', 'いいね！', 'すごい！！', 'てんさい！！！'];
+
+  function renderComboTier() {
+    const tier = comboTier(state.combo);
+    [1, 2, 3].forEach((t) => els.comboItem.classList.toggle(`combo-tier-${t}`, tier === t));
+    document.body.classList.toggle('is-rainbow', tier >= 3);
+  }
+
+  function showBanner(main, sub, tier) {
+    if (REDUCE) return;
+    const b = document.createElement('div');
+    b.className = `fx-banner tier-${tier}`;
+    b.innerHTML = `${main}${sub ? `<small>${sub}</small>` : ''}`;
+    document.body.appendChild(b);
+    gsap.timeline({ onComplete: () => b.remove() })
+      .fromTo(b, { xPercent: -50, yPercent: -50, scale: 3, rotation: -14, opacity: 0 },
+        { scale: 1, rotation: -5, opacity: 1, duration: 0.35, ease: 'back.out(2.5)' })
+      .to(b, { scale: 1.1, duration: 0.1, yoyo: true, repeat: 3, ease: 'sine.inOut' })
+      .to(b, { y: -70, opacity: 0, duration: 0.4, ease: 'power2.in' }, '+=0.35');
+  }
+
+  function screenFlash() {
+    if (REDUCE) return;
+    const f = document.createElement('div');
+    f.className = 'fx-flash';
+    document.body.appendChild(f);
+    gsap.fromTo(f, { opacity: 0.75 }, { opacity: 0, duration: 0.4, ease: 'power2.out', onComplete: () => f.remove() });
+  }
+
+  function speedLines(dur = 1) {
+    if (REDUCE) return;
+    const l = document.createElement('div');
+    l.className = 'fx-speedlines';
+    document.body.appendChild(l);
+    gsap.to(l, { rotation: 25, duration: dur, ease: 'none' });
+    gsap.timeline({ onComplete: () => l.remove() })
+      .fromTo(l, { opacity: 0, scale: 1.3 }, { opacity: 0.85, scale: 1, duration: 0.15 })
+      .to(l, { opacity: 0, duration: 0.4 }, dur - 0.4);
+  }
+
+  // #app に transform をかけると中の position:fixed がずれるので、画面の部品を個別に揺らす
+  function screenShake(power = 10, dur = 0.45) {
+    if (REDUCE) return;
+    const targets = [els.gameHeader, els.shopScene, els.paymentPanel, els.feedbackOverlay];
+    const tl = gsap.timeline({ onComplete: () => gsap.set(targets, { clearProps: 'x,y' }) });
+    const n = Math.round(dur / 0.045);
+    for (let i = 0; i < n; i++) {
+      const p = power * (1 - i / n);
+      tl.to(targets, { x: gsap.utils.random(-p, p), y: gsap.utils.random(-p, p), duration: 0.045, ease: 'none' });
+    }
+  }
+
+  // 一瞬だけ時間をゆっくりにして、すぐ元に戻す
+  function slowMo(hold = 380) {
+    if (REDUCE) return;
+    const g = gsap.globalTimeline;
+    g.timeScale(0.3);
+    const start = performance.now() + hold;
+    const step = (now) => {
+      const t = Math.min(1, Math.max(0, (now - start) / 450));
+      g.timeScale(0.3 + 0.7 * t);
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // ---------- スコアにコインが飛んでいく ----------
+  let dopaRun = 0;
+
+  function flyDopa(fromScore, gain, bonus) {
+    const run = ++dopaRun;
+    const start = centerOf(rectOf(els.feedbackFace));
+    const end = centerOf(rectOf(els.hudScore));
+    els.hudScore.classList.add('hud-lift');
+
+    const label = document.createElement('div');
+    label.className = 'fx-gain';
+    label.innerHTML = `+${gain}${bonus ? `<small> コンボ+${bonus}</small>` : ''}`;
+    document.body.appendChild(label);
+    const lw = label.offsetWidth;
+    gsap.timeline({ onComplete: () => label.remove() })
+      .fromTo(label, { x: start.x - lw / 2, y: start.y - 20, scale: 0.3, opacity: 0 },
+        { y: start.y - 70, scale: 1.2, opacity: 1, duration: 0.35, ease: 'back.out(2.5)' })
+      .to(label, { x: end.x - lw / 2, y: end.y - 14, scale: 0.6, opacity: 0, duration: 0.55, ease: 'power2.in' }, '+=0.25');
+
+    const count = Math.min(5 + state.combo * 2, 20);
+    const denoms = [10, 50, 100, 500];
+    for (let i = 0; i < count; i++) {
+      const d = document.createElement('div');
+      d.className = 'fx-item';
+      d.innerHTML = ART.coin(denoms[randInt(0, 3)]);
+      d.firstChild.style.width = '30px';
+      d.firstChild.style.height = '30px';
+      els.fxLayer.appendChild(d);
+      const sx = start.x - 15 + randInt(-30, 30);
+      const sy = start.y - 15 + randInt(-20, 20);
+      gsap.set(d, { x: sx, y: sy, scale: 0 });
+      gsap.timeline({ delay: 0.25 + i * 0.045, onComplete: () => {
+        d.remove();
+        if (run !== dopaRun) return;
+        sfx('dopa', i);
+        els.scoreValue.textContent = Math.round(fromScore + (gain * (i + 1)) / count);
+        gsap.fromTo(els.hudScore, { scale: 1.18 }, { scale: 1, duration: 0.18, ease: 'power2.out' });
+        if (i === count - 1) sparkleAt(end.x, end.y, 8);
+      } })
+        .to(d, { scale: 1.1, y: sy - randInt(30, 70), x: sx + randInt(-40, 40), duration: 0.22, ease: 'power2.out' })
+        .to(d, { x: end.x - 15, y: end.y - 15, scale: 0.5, rotation: randInt(180, 540), duration: 0.42, ease: 'power2.in' });
+    }
+  }
+
+  function finishDopa() {
+    dopaRun++;
+    els.hudScore.classList.remove('hud-lift');
+    els.scoreValue.textContent = state.score;
   }
 
   // ---------- フィードバック ----------
@@ -705,6 +837,8 @@
 
   function showFeedback(result) {
     const conf = FEEDBACK[result.status];
+    let tier = 0;
+    let tierUp = false;
     catReact(els.gameMascot, conf.mood);
 
     els.feedbackFace.innerHTML = ART.faceBadge(conf.mood);
@@ -717,21 +851,36 @@
     } else {
       pendingRetry = false;
       els.nextBtn.textContent = 'つぎへ';
+      const prevScore = state.score;
+      const prevTier = comboTier(state.combo);
+      let gain = 30;
+      let bonus = 0;
+      if (result.status === 'perfect' || result.status === 'good') {
+        state.combo += 1; state.bestCount += 1;
+        gain = result.status === 'perfect' ? 100 : 80;
+        bonus = Math.min(state.combo - 1, 5) * 20; // コンボが続くほど点数もインフレ
+        gain += bonus;
+        sfx(result.status, state.combo);
+      }
       if (result.status === 'perfect') {
         els.feedbackSub.textContent = conf.sub;
-        sfx('perfect');
-        state.score += 100; state.combo += 1; state.bestCount += 1;
       } else if (result.status === 'good') {
         els.feedbackSub.textContent = `おつりは ${result.change}えん（${result.changeCoins}まい）\nこれいじょう すくなく できないよ！`;
-        sfx('good');
-        state.score += 80; state.combo += 1; state.bestCount += 1;
       } else {
         els.feedbackSub.textContent = `おつりが ${result.changeCoins}まいに なったよ\nさいしょうは ${result.minCoins}まい！`;
         sfx('close');
-        state.score += 30; state.combo = 0;
+        state.combo = 0;
       }
-      updateHud();
-      if (result.status === 'perfect') { popEl(els.comboItem, 1.25); popEl($('hudScore'), 1.15); }
+      state.score += gain;
+      tier = comboTier(state.combo);
+      tierUp = tier > prevTier;
+      renderComboTier();
+      if (REDUCE) updateHud(false);
+      else {
+        tickNumber(els.comboValue, state.combo, 0.3);
+        if (result.status !== 'close') popEl(els.comboItem, 1.25 + tier * 0.1);
+        gsap.delayedCall(0.5, () => flyDopa(prevScore, gain, bonus));
+      }
     }
 
     els.feedbackOverlay.classList.add('show');
@@ -744,9 +893,15 @@
         .fromTo(els.feedbackSub, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.25 }, '-=0.15')
         .fromTo(els.nextBtn, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2)' }, '-=0.1');
 
-      if (result.status === 'perfect') celebrate('perfect');
-      else if (result.status === 'good') celebrate('good');
-      else shake(els.feedbackCard, 10);
+      if (result.status === 'perfect' || result.status === 'good') {
+        celebrate(result.status, tier);
+        if (tier >= 1) showBanner(`${state.combo}れんぞく！`, TIER_WORDS[tier], tier);
+        if (tierUp) sfx('comboUp', tier);
+        if (tier >= 2) { screenFlash(); screenShake(6 + tier * 3); speedLines(1.1); sfx('flash'); }
+        if (tier >= 3) slowMo();
+      } else {
+        shake(els.feedbackCard, 10);
+      }
     }
   }
 
@@ -774,6 +929,7 @@
 
   function onNextClick() {
     const close = () => {
+      finishDopa();
       els.feedbackOverlay.classList.remove('show');
       if (pendingRetry) { pendingRetry = false; updateTotals(false); return; }
       advanceQuestion();
@@ -830,8 +986,71 @@
       progress[mode.key][state.levelIndex] = stars;
       saveProgress();
     }
-    if (state.levelIndex >= mode.levels.length - 1) showModeClear(stars);
-    else showLevelClear(stars);
+    const next = () => {
+      if (state.levelIndex >= mode.levels.length - 1) showModeClear(stars);
+      else showLevelClear(stars);
+    };
+    if (state.bestCount >= QUESTIONS_PER_LEVEL) showFever(next);
+    else next();
+  }
+
+  // ---------- フィーバー（ぜんもん せいかい） ----------
+  const FEVER_BONUS = 500;
+  const FEVER_BADGE = { free: 'おつりマスター！', wallet: 'おさいふ めいじん！' };
+  let feverDone = null;
+  const feverTweens = [];
+  let feverBgmTimer = null;
+
+  function showFever(done) {
+    feverDone = done;
+    state.score += FEVER_BONUS;
+    clearCatTimelines();
+    els.feverMascot.innerHTML = ART.cat('happy');
+    els.feverBadge.textContent = FEVER_BADGE[state.modeKey] || FEVER_BADGE.free;
+    els.feverBonus.textContent = `+${FEVER_BONUS}`;
+    els.feverOverlay.classList.add('show');
+    document.body.classList.add('is-fever');
+    sfx('fever');
+    if (window.SFX) feverBgmTimer = setTimeout(() => window.SFX.startFever(), 900);
+    if (REDUCE) return;
+
+    const opts = { colors: PARTY_COLORS, disableForReducedMotion: true };
+    gsap.timeline()
+      .fromTo(els.feverOverlay, { opacity: 0 }, { opacity: 1, duration: 0.25 })
+      .fromTo(els.feverTitle, { scale: 4, rotation: -20, opacity: 0 }, { scale: 1, rotation: -4, opacity: 1, duration: 0.5, ease: 'back.out(2.2)' })
+      .add(() => { screenFlash(); burst({ ...opts, particleCount: 200, spread: 160, startVelocity: 55, origin: { x: 0.5, y: 0.5 } }); })
+      .fromTo(els.feverMascot, { scale: 0, y: 60 }, { scale: 1, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.5)' }, '-=0.1')
+      .fromTo('.fever-rank', { opacity: 0 }, { opacity: 1, duration: 0.2 })
+      .fromTo(els.feverBadge, { scale: 0, rotation: 30 }, { scale: 1, rotation: 0, duration: 0.6, ease: 'elastic.out(1, 0.45)' })
+      .fromTo('.fever-bonus', { scale: 0 }, { scale: 1, duration: 0.35, ease: 'back.out(3)' }, '-=0.2')
+      .fromTo(els.feverNextBtn, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(2.4)' });
+
+    // ネコがおどる・タイトルがはねる・紙吹雪とコインが降り続ける
+    feverTweens.push(
+      gsap.to(els.feverTitle, { scale: 1.08, duration: 0.18, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 0.8 }),
+      gsap.to(els.feverMascot, { rotation: 12, duration: 0.18, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1, transformOrigin: '50% 90%' }),
+      gsap.to(els.feverMascot, { y: -16, duration: 0.18, yoyo: true, repeat: -1, ease: 'power1.out', delay: 1 }),
+      gsap.to(els.feverBadge, { y: -5, duration: 0.36, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1.6 }),
+      gsap.to({}, { duration: 0.7, repeat: -1, delay: 1, onRepeat: () => {
+        const side = Math.random() < 0.5;
+        burst({ ...opts, particleCount: 70, angle: side ? 60 : 120, spread: 65, startVelocity: 50, origin: { x: side ? 0 : 1, y: 0.8 } });
+      } }),
+      gsap.to({}, { duration: 1.3, repeat: -1, delay: 0.6, onRepeat: () => coinRain(14) }),
+    );
+  }
+
+  function closeFever() {
+    if (!feverDone) return;
+    clearTimeout(feverBgmTimer);
+    if (window.SFX) window.SFX.stopFever();
+    feverTweens.forEach((t) => t.kill());
+    feverTweens.length = 0;
+    gsap.set([els.feverTitle, els.feverMascot, els.feverBadge], { clearProps: 'all' });
+    els.feverOverlay.classList.remove('show');
+    document.body.classList.remove('is-fever');
+    const done = feverDone;
+    feverDone = null;
+    done();
   }
 
   function showLevelClear(stars) {
@@ -940,6 +1159,7 @@
     state.bestCount = 0;
     state.minTrayH = 0;
     state.minWalletH = 0;
+    renderComboTier();
     generateQuestion();
 
     clearCatTimelines();
@@ -984,6 +1204,7 @@
   els.nextLevelBtn.addEventListener('click', () => { sfx('select'); startLevel(state.modeKey, state.levelIndex + 1); });
   els.payBtn.addEventListener('click', submitPayment);
   els.nextBtn.addEventListener('click', () => { sfx('tap'); onNextClick(); });
+  els.feverNextBtn.addEventListener('click', () => { sfx('select'); closeFever(); });
 
   // --- コインのタップ処理 ---
   // clickイベントだけに頼ると、スマホでスクロール判定に吸われたときに
