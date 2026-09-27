@@ -16,6 +16,8 @@
       desc: 'コインは つかいほうだい。ぴったりの きんがくを つくろう',
       note: 'コインは なんまいでも つかえます。ぴったり はらえたら パーフェクト！',
       levels: [
+        // レベル0：ねだん いじょう はらえれば OK（ぴったりでなくても、まいすうが おおくても よい）
+        { name: 'はらえれば OK', detail: '10〜300えん・おおめに はらっても だいじょうぶ', coins: [10, 50, 100], priceMin: 10, priceMax: 300, priceStep: 10, anyPay: true },
         { name: '10・50・100えん', detail: '10〜200えん（10えんずつ）', coins: [10, 50, 100], priceMin: 10, priceMax: 200, priceStep: 10 },
         { name: '500えんも なかま', detail: '50〜500えん（10えんずつ）', coins: [10, 50, 100, 500], priceMin: 50, priceMax: 500, priceStep: 10 },
         { name: '5えんも なかま', detail: '50〜500えん（5えんずつ）', coins: [5, 10, 50, 100, 500], priceMin: 50, priceMax: 500, priceStep: 5 },
@@ -44,6 +46,8 @@
   ];
   MODES.forEach((mode) => mode.levels.forEach((lv, i) => {
     lv.index = i; lv.modeKey = mode.key; lv.unlimited = !lv.hand;
+    // レベル0があるモードは 0 から、ないモードは 1 から数える
+    lv.no = mode.levels[0].anyPay ? i : i + 1;
   }));
 
   const getMode = (key) => MODES.find((m) => m.key === key);
@@ -51,13 +55,23 @@
   const currentLevel = () => currentMode().levels[state.levelIndex];
 
   // ---------- 進捗（星の数）の保存 ----------
-  const PROGRESS_KEY = 'otsuri-progress-v1';
+  const PROGRESS_KEY = 'otsuri-progress-v2';
+  const OLD_PROGRESS_KEY = 'otsuri-progress-v1';
+
+  // v1 はレベル0がなかったので、じゆうモードの記録を1つ後ろにずらして引き継ぐ
+  function readSavedProgress() {
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    if (raw) return JSON.parse(raw);
+    const old = JSON.parse(localStorage.getItem(OLD_PROGRESS_KEY) || '{}');
+    if (Array.isArray(old.free)) old.free = [0, ...old.free];
+    return old;
+  }
 
   function loadProgress() {
     const fresh = {};
     MODES.forEach((m) => { fresh[m.key] = m.levels.map(() => 0); });
     try {
-      const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+      const saved = readSavedProgress();
       MODES.forEach((m) => {
         if (!Array.isArray(saved[m.key])) return;
         m.levels.forEach((_, i) => {
@@ -75,7 +89,10 @@
     try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* 保存できなくても続行 */ }
   }
 
-  const isUnlocked = (modeKey, idx) => idx === 0 || progress[modeKey][idx - 1] > 0;
+  // レベル0は練習なので、クリアしなくても次のレベルは遊べる
+  const isUnlocked = (modeKey, idx) => idx === 0
+    || progress[modeKey][idx - 1] > 0
+    || getMode(modeKey).levels[idx - 1].anyPay === true;
 
   const PARTY_COLORS = ['#ff6fa5', '#ffd166', '#5ec8e0', '#6fcf8a', '#b18cf5', '#ffffff'];
 
@@ -385,7 +402,7 @@
     gsap.set(els.productArt, { clearProps: 'all' });
     els.productArt.innerHTML = ART.item(state.product.key);
     els.productName.textContent = state.product.name;
-    els.gameLevelName.textContent = `${currentMode().name}・レベル${state.levelIndex + 1}`;
+    els.gameLevelName.textContent = `${currentMode().name}・レベル${level.no}`;
     els.questionValue.textContent = `${state.questionIndex + 1}/${QUESTIONS_PER_LEVEL}`;
     els.wallet.innerHTML = '';
     els.wallet.style.height = '';
@@ -493,9 +510,11 @@
     el.dataset.flying = '1';
     sfx('coinUp');
     const slot = createSlot(value);
-    el.parentNode.insertBefore(slot, el);
     el.__slot = slot;
     flipCoins(() => {
+      // 跡のスロットは位置を記録した後に入れる。先に入れると記録の瞬間だけ
+      // 後ろのコインが1つ右にずれ、そこから戻る「左詰め」の動きが出てしまう。
+      el.parentNode.insertBefore(slot, el);
       el.className = `coin-chip coin-${value}`;
       els.wallet.appendChild(el);
       el.__activate = () => deselectLimited(el, value);
@@ -525,15 +544,15 @@
     if (state.busy) return;
     sfx('coinUp');
     const startRect = rectOf(sourceEl);
-    const siblings = REDUCE ? null : Flip.getState([...els.wallet.children]);
 
+    // さいふの最後に足すだけなので、ほかのコインは動かさない。
+    // （飛んでいる途中のコインに Flip をかけると、途中の位置で止まってしまう）
     const chip = makeCoinEl(value, 'coin-chip');
     chip.__activate = () => deselectUnlimited(chip, sourceEl, value);
     els.wallet.appendChild(chip);
 
-    if (siblings) Flip.from(siblings, { duration: 0.4, ease: 'power3.out' });
-
     if (!REDUCE) {
+      chip.dataset.flying = '1'; // とうちゃくするまでは もどせない
       gsap.fromTo(sourceEl, { scale: 1 }, { scale: 0.82, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.out' });
       const endRect = rectOf(chip);
       const dx = centerOf(startRect).x - centerOf(endRect).x;
@@ -544,6 +563,7 @@
         motionPath: { path: [{ x: dx, y: dy }, { x: dx * 0.45, y: dy * 0.4 - 60 }, { x: 0, y: 0 }], curviness: 1.3 },
         onComplete: () => {
           gsap.set(chip, { clearProps: 'transform' });
+          chip.dataset.flying = '0';
           const c = centerOf(rectOf(chip));
           sparkleAt(c.x, c.y, 3, '#ffe9a3');
         },
@@ -562,7 +582,8 @@
 
     const from = rectOf(chip);
     const to = rectOf(sourceEl);
-    const siblings = Flip.getState([...els.wallet.children].filter((c) => c !== chip));
+    // 飛んでいる途中のコインは自分のアニメーションで着地するので、詰める対象から外す
+    const siblings = Flip.getState([...els.wallet.children].filter((c) => c !== chip && c.dataset.flying !== '1'));
     detach(chip, from);
     Flip.from(siblings, { duration: 0.4, ease: 'power3.out' });
 
@@ -624,6 +645,7 @@
     const change = total - state.price;
     const changeCoins = greedyCoinCount(change);
     if (changeCoins === 0) return { status: 'perfect', change, changeCoins };
+    if (level.anyPay) return { status: 'paid', change, changeCoins };
     const minCoins = minChangeCoins(state.price, state.originalHand, level.unlimited);
     if (changeCoins === minCoins) return { status: 'good', change, changeCoins, minCoins };
     return { status: 'close', change, changeCoins, minCoins };
@@ -831,6 +853,7 @@
   const FEEDBACK = {
     perfect: { mood: 'happy', title: 'パーフェクト！', sub: 'ぴったり はらえたね！' },
     good: { mood: 'good', title: 'グッド！', sub: '' },
+    paid: { mood: 'happy', title: 'はらえたね！', sub: '' },
     close: { mood: 'close', title: 'おしい、もうすこし！', sub: '' },
     insufficient: { mood: 'sad', title: 'たりないよ！', sub: '' },
   };
@@ -855,15 +878,18 @@
       const prevTier = comboTier(state.combo);
       let gain = 30;
       let bonus = 0;
-      if (result.status === 'perfect' || result.status === 'good') {
+      const ok = result.status === 'perfect' || result.status === 'good' || result.status === 'paid';
+      if (ok) {
         state.combo += 1; state.bestCount += 1;
-        gain = result.status === 'perfect' ? 100 : 80;
+        gain = result.status === 'good' ? 80 : 100;
         bonus = Math.min(state.combo - 1, 5) * 20; // コンボが続くほど点数もインフレ
         gain += bonus;
-        sfx(result.status, state.combo);
+        sfx(result.status === 'good' ? 'good' : 'perfect', state.combo);
       }
       if (result.status === 'perfect') {
         els.feedbackSub.textContent = conf.sub;
+      } else if (result.status === 'paid') {
+        els.feedbackSub.textContent = `おつりは ${result.change}えん だよ`;
       } else if (result.status === 'good') {
         els.feedbackSub.textContent = `おつりは ${result.change}えん（${result.changeCoins}まい）\nこれいじょう すくなく できないよ！`;
       } else {
@@ -893,8 +919,8 @@
         .fromTo(els.feedbackSub, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.25 }, '-=0.15')
         .fromTo(els.nextBtn, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2)' }, '-=0.1');
 
-      if (result.status === 'perfect' || result.status === 'good') {
-        celebrate(result.status, tier);
+      if (result.status === 'perfect' || result.status === 'good' || result.status === 'paid') {
+        celebrate(result.status === 'good' ? 'good' : 'perfect', tier);
         if (tier >= 1) showBanner(`${state.combo}れんぞく！`, TIER_WORDS[tier], tier);
         if (tierUp) sfx('comboUp', tier);
         if (tier >= 2) { screenFlash(); screenShake(6 + tier * 3); speedLines(1.1); sfx('flash'); }
@@ -1057,7 +1083,7 @@
     clearCatTimelines();
     els.clearMascot.innerHTML = ART.cat('happy');
     animateCat(els.clearMascot);
-    els.clearedLevel.textContent = state.levelIndex + 1;
+    els.clearedLevel.textContent = currentLevel().no;
     els.clearScore.textContent = '0';
     renderStars(els.clearStars, stars);
     showScreen('screen-levelclear');
@@ -1132,7 +1158,7 @@
       const starMarks = [0, 1, 2]
         .map((n) => `<span class="${n < stars ? '' : 'star--empty'}">${ART.star()}</span>`).join('');
       card.innerHTML = `
-        <span class="level-no">${i + 1}</span>
+        <span class="level-no">${level.no}</span>
         <span class="level-body">
           <span class="level-name">${level.name}</span>
           <span class="level-detail">${level.detail}</span>
