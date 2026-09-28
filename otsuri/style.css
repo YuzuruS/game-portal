@@ -351,7 +351,10 @@ body {
 .feedback-face { width: 140px; margin: 0 auto 6px; }
 .feedback-face svg { width: 100%; height: auto; display: block; }
 .feedback-text { font-family: 'Mochiy Pop One', sans-serif; font-size: 1.55rem; color: var(--pink-dark); margin-bottom: 6px; }
-.feedback-sub { font-size: .92rem; color: var(--ink-soft); font-weight: 700; margin-bottom: 16px; min-height: 1.2em; line-height: 1.5; }
+.feedback-sub { font-size: .92rem; color: var(--ink-soft); font-weight: 700; margin-bottom: 16px; min-height: 1.2em; line-height: 1.5; white-space: pre-line; }
+.feedback-buttons { display: flex; gap: 10px; justify-content: center; }
+/* 「もういちど」と「つぎへ」を並べるときは同じ大きさにそろえる */
+.feedback-buttons.is-two .btn { flex: 1; min-width: 0; padding: 14px 8px; font-size: 1rem; }
 
 /* ---------- クリア画面 ---------- */
 #screen-levelclear, #screen-finalclear { align-items: center; justify-content: center; text-align: center; }

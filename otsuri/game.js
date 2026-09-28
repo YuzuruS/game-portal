@@ -146,9 +146,11 @@
   const state = {
     modeKey: 'free', levelIndex: 0, questionIndex: 0, score: 0, combo: 0, bestCount: 0,
     price: 0, product: ART.ITEM_LIST[0], originalHand: {}, busy: false,
+    retrying: false, // 「おしい」のあと同じ問題にやり直している
     minTrayH: 0, minWalletH: 0,
   };
   let pendingRetry = false;
+  let coinIntro = null; // 出題時にコインがならぶアニメーション
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -167,6 +169,7 @@
     nextLevelBtn: $('nextLevelBtn'), clearedLevel: $('clearedLevel'),
     clearScore: $('clearScore'), clearStars: $('clearStars'), clearMascot: $('clearMascot'),
     finalScore: $('finalScore'), finalTrophy: $('finalTrophy'), titleMascot: $('titleMascot'),
+    retryBtn: $('retryBtn'), feedbackButtons: $('feedbackButtons'),
     speechBubble: $('speechBubble'), shopScene: document.querySelector('.shop-scene'),
     fxLayer: $('fxLayer'), skyLayer: $('skyLayer'), app: $('app'),
     hudScore: $('hudScore'), paymentPanel: document.querySelector('.payment-panel'),
@@ -206,12 +209,21 @@
   function centerOf(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 
   function tickNumber(el, to, dur = 0.45) {
+    // 前のカウントアップが残っていると、あとから古い数字で上書きされるので止める
+    if (el.__tick) el.__tick.kill();
+    el.__tick = null;
     const obj = { v: Number(el.textContent.replace(/[^0-9-]/g, '')) || 0 };
     if (obj.v === to) return;
-    gsap.to(obj, {
+    el.__tick = gsap.to(obj, {
       v: to, duration: D(dur), ease: 'power2.out',
       onUpdate: () => { el.textContent = Math.round(obj.v); },
     });
+  }
+
+  // アニメーションなしで数字を置く（動いているカウントアップも止める）
+  function setNumber(el, v) {
+    if (el.__tick) { el.__tick.kill(); el.__tick = null; }
+    el.textContent = v;
   }
 
   function popEl(el, scale = 1.16) {
@@ -372,6 +384,7 @@
 
   function generateQuestion() {
     const level = currentLevel();
+    state.retrying = false;
     state.product = ART.ITEM_LIST[randInt(0, ART.ITEM_LIST.length - 1)];
 
     if (level.unlimited) {
@@ -416,21 +429,22 @@
 
     if (animate && !REDUCE) {
       sfx('question');
-      els.priceValue.textContent = '0';
+      setNumber(els.priceValue, 0);
       const tl = gsap.timeline();
       tl.fromTo(els.speechBubble, { scale: 0.6, opacity: 0, transformOrigin: 'left center' },
         { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.8)' })
         .fromTo(els.productArt, { scale: 0, rotation: -50 },
           { scale: 1, rotation: 0, duration: 0.6, ease: 'elastic.out(1, 0.55)' }, '-=0.25')
         .add(() => tickNumber(els.priceValue, state.price, 0.5), '-=0.35')
-        .fromTo(els.coinTray.querySelectorAll('.coin-btn'),
-          { scale: 0, y: 26, rotation: -40 },
-          { scale: 1, y: 0, rotation: 0, duration: 0.55, ease: 'back.out(2.2)', stagger: { each: 0.035, from: 'center' } }, '-=0.3')
         .add(() => {
           gsap.to(els.productArt, { y: -5, rotation: 3, duration: 1.5, yoyo: true, repeat: -1, ease: 'sine.inOut' });
         });
+      // コインの登場はタイムラインに入れず単独で持っておき、途中でタップされたら終わらせる
+      coinIntro = gsap.fromTo(els.coinTray.querySelectorAll('.coin-btn'),
+        { scale: 0, y: 26, rotation: -40 },
+        { scale: 1, y: 0, rotation: 0, duration: 0.55, delay: 0.55, ease: 'back.out(2.2)', stagger: { each: 0.035, from: 'center' } });
     } else {
-      els.priceValue.textContent = state.price;
+      setNumber(els.priceValue, state.price);
     }
   }
 
@@ -623,7 +637,7 @@
       tickNumber(els.totalValue, total, 0.35);
       popEl(els.totalDisplay, 1.05);
     } else {
-      els.totalValue.textContent = total;
+      setNumber(els.totalValue, total);
     }
     els.payBtn.disabled = total <= 0;
   }
@@ -633,8 +647,8 @@
       tickNumber(els.scoreValue, state.score, 0.6);
       tickNumber(els.comboValue, state.combo, 0.3);
     } else {
-      els.scoreValue.textContent = state.score;
-      els.comboValue.textContent = state.combo;
+      setNumber(els.scoreValue, state.score);
+      setNumber(els.comboValue, state.combo);
     }
   }
 
@@ -846,7 +860,7 @@
   function finishDopa() {
     dopaRun++;
     els.hudScore.classList.remove('hud-lift');
-    els.scoreValue.textContent = state.score;
+    setNumber(els.scoreValue, state.score);
   }
 
   // ---------- フィードバック ----------
@@ -866,6 +880,10 @@
 
     els.feedbackFace.innerHTML = ART.faceBadge(conf.mood);
     els.feedbackText.textContent = conf.title;
+    // 「おしい」のときだけ、つぎへ すすむか もういちど やるかを えらべる
+    const canRetry = result.status === 'close';
+    els.retryBtn.hidden = !canRetry;
+    els.feedbackButtons.classList.toggle('is-two', canRetry);
     if (result.status === 'insufficient') {
       els.feedbackSub.textContent = `あと ${result.short}えん たりません`;
       sfx('miss');
@@ -876,11 +894,13 @@
       els.nextBtn.textContent = 'つぎへ';
       const prevScore = state.score;
       const prevTier = comboTier(state.combo);
-      let gain = 30;
+      let gain = state.retrying ? 0 : 30;
       let bonus = 0;
       const ok = result.status === 'perfect' || result.status === 'good' || result.status === 'paid';
       if (ok) {
-        state.combo += 1; state.bestCount += 1;
+        // ほしの かずは さいしょの こたえで きめる（やりなおしは てんすうだけ）
+        state.combo += 1;
+        if (!state.retrying) state.bestCount += 1;
         gain = result.status === 'good' ? 80 : 100;
         bonus = Math.min(state.combo - 1, 5) * 20; // コンボが続くほど点数もインフレ
         gain += bonus;
@@ -905,7 +925,8 @@
       else {
         tickNumber(els.comboValue, state.combo, 0.3);
         if (result.status !== 'close') popEl(els.comboItem, 1.25 + tier * 0.1);
-        gsap.delayedCall(0.5, () => flyDopa(prevScore, gain, bonus));
+        if (gain > 0) gsap.delayedCall(0.5, () => flyDopa(prevScore, gain, bonus));
+        else setNumber(els.scoreValue, state.score);
       }
     }
 
@@ -917,7 +938,8 @@
         .fromTo(els.feedbackFace, { scale: 0, rotation: -30 }, { scale: 1, rotation: 0, duration: 0.65, ease: 'elastic.out(1, 0.5)' }, '-=0.4')
         .fromTo(els.feedbackText, { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3 }, '-=0.4')
         .fromTo(els.feedbackSub, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.25 }, '-=0.15')
-        .fromTo(els.nextBtn, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2)' }, '-=0.1');
+        .fromTo([els.retryBtn, els.nextBtn].filter((b) => !b.hidden), { scale: 0.6, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2)', stagger: 0.06 }, '-=0.1');
 
       if (result.status === 'perfect' || result.status === 'good' || result.status === 'paid') {
         celebrate(result.status === 'good' ? 'good' : 'perfect', tier);
@@ -953,17 +975,31 @@
     }
   }
 
-  function onNextClick() {
+  function closeFeedback(after) {
     const close = () => {
       finishDopa();
       els.feedbackOverlay.classList.remove('show');
-      if (pendingRetry) { pendingRetry = false; updateTotals(false); return; }
-      advanceQuestion();
+      after();
     };
     if (REDUCE) { close(); return; }
     gsap.to(els.feedbackCard, {
       scale: 0.7, y: 30, opacity: 0, duration: 0.25, ease: 'power2.in',
       onComplete: () => { gsap.set(els.feedbackCard, { clearProps: 'all' }); close(); },
+    });
+  }
+
+  function onNextClick() {
+    closeFeedback(() => {
+      if (pendingRetry) { pendingRetry = false; updateTotals(false); return; }
+      advanceQuestion();
+    });
+  }
+
+  // おなじ ねだん・おなじ てもちで もういちど
+  function onRetryClick() {
+    closeFeedback(() => {
+      state.retrying = true;
+      renderQuestion();
     });
   }
 
@@ -1230,6 +1266,7 @@
   els.nextLevelBtn.addEventListener('click', () => { sfx('select'); startLevel(state.modeKey, state.levelIndex + 1); });
   els.payBtn.addEventListener('click', submitPayment);
   els.nextBtn.addEventListener('click', () => { sfx('tap'); onNextClick(); });
+  els.retryBtn.addEventListener('click', () => { sfx('tap'); onRetryClick(); });
   els.feverNextBtn.addEventListener('click', () => { sfx('select'); closeFever(); });
 
   // --- コインのタップ処理 ---
@@ -1247,7 +1284,10 @@
     if (el && !REDUCE) gsap.to(el.querySelector('svg'), { scale: 1, duration: 0.22, ease: 'back.out(3)' });
   };
   const activateCoin = (el) => {
-    if (el && typeof el.__activate === 'function') el.__activate();
+    if (!el || typeof el.__activate !== 'function') return;
+    // 登場アニメーションの途中で動かすと、途中の大きさ・傾きのまま固まってしまうので先に終わらせる
+    if (coinIntro && coinIntro.progress() < 1) coinIntro.progress(1);
+    el.__activate();
   };
 
   document.addEventListener('pointerdown', (e) => {
