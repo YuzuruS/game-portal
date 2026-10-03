@@ -47,11 +47,15 @@ window.ART = (() => {
 
   function coin(value) {
     const c = COINS[value];
-    const g = nid('cg'), s = nid('cs'), m = nid('cm');
+    const g = nid('cg'), s = nid('cs');
     const r = 30 * c.scale;
-    const holeMask = c.hole
-      ? `<mask id="${m}"><rect width="64" height="64" fill="#fff"/><circle cx="32" cy="32" r="${6.4 * c.scale}" fill="#000"/></mask>`
-      : '';
+    // 穴は <mask> を使わず、even-odd のパスでくり抜く。
+    // <mask> は Safari / iOS で transform やフィルターと組み合わせると
+    // コインごと消えることがあるため。
+    const hr = 6.4 * c.scale;
+    const body = c.hole
+      ? `<path fill-rule="evenodd" fill="url(#${g})" d="M${32 - r} 32a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0zM${32 - hr} 32a${hr} ${hr} 0 1 1 ${2 * hr} 0a${hr} ${hr} 0 1 1 ${-2 * hr} 0z"/>`
+      : `<circle cx="32" cy="32" r="${r}" fill="url(#${g})"/>`;
     const numY = c.hole ? 46 : 37.5;
     const numSize = c.hole ? 14 : (String(value).length >= 3 ? 19 : 24);
     return `<svg class="coin-svg" viewBox="0 0 64 64" aria-hidden="true">
@@ -62,10 +66,9 @@ window.ART = (() => {
           <stop offset="100%" stop-color="${c.dark}"/>
         </radialGradient>
         ${gloss(s)}
-        ${holeMask}
       </defs>
-      <g ${c.hole ? `mask="url(#${m})"` : ''}>
-        <circle cx="32" cy="32" r="${r}" fill="url(#${g})"/>
+      <g>
+        ${body}
         <circle cx="32" cy="32" r="${r - 0.9}" fill="none" stroke="${c.dark}" stroke-opacity=".5" stroke-width="2.4" stroke-dasharray="1.6 3.1"/>
         <circle cx="32" cy="32" r="${r - 3.4}" fill="none" stroke="${c.light}" stroke-opacity=".75" stroke-width="1.4"/>
         <circle cx="32" cy="32" r="${r - 5.2}" fill="none" stroke="${c.dark}" stroke-opacity=".28" stroke-width="1"/>
