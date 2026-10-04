@@ -421,6 +421,9 @@
     els.wallet.style.height = '';
     els.wallet.style.minHeight = '';
     els.coinTray.style.minHeight = '';
+    // 前の問題の広さは引き継がず、1問ごとにリセットする
+    state.minTrayH = 0;
+    state.minWalletH = 0;
     renderCoinTray(level);
     reserveHeights();
     updateTotals(false);
@@ -458,8 +461,8 @@
     return el;
   }
 
-  // 問題が変わってもボタンの位置が上に跳ねないよう、さいふとトレイの高さは
-  // そのレベル中に必要だった最大の高さを保つ（縮めない）。
+  // 同じ問題の中でコインを動かしてもボタンの位置が上下に跳ねないよう、
+  // さいふとトレイの高さはその問題で必要だった最大の高さを保つ（縮めない）。
   function reserveHeights() {
     const trayH = els.coinTray.getBoundingClientRect().height;
     if (trayH > state.minTrayH) state.minTrayH = trayH;
@@ -1219,8 +1222,6 @@
     state.score = 0;
     state.combo = 0;
     state.bestCount = 0;
-    state.minTrayH = 0;
-    state.minWalletH = 0;
     renderComboTier();
     generateQuestion();
 
